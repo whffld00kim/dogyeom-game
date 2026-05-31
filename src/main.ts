@@ -7,6 +7,7 @@ import StageMapScene from './scenes/StageMapScene';
 import GameScene from './scenes/GameScene';
 import ResultScene from './scenes/ResultScene';
 import DexScene from './scenes/DexScene';
+import ShopScene from './scenes/ShopScene';
 import DialogueScene from './scenes/DialogueScene';
 import DebugScene from './scenes/DebugScene';
 
@@ -25,7 +26,7 @@ const config: Phaser.Types.Core.GameConfig = {
     zoom: HD,
   },
   render: { antialias: true },
-  scene: [BootScene, TitleScene, SettingsScene, StageMapScene, GameScene, ResultScene, DexScene, DialogueScene, DebugScene],
+  scene: [BootScene, TitleScene, SettingsScene, StageMapScene, GameScene, ResultScene, DexScene, ShopScene, DialogueScene, DebugScene],
 };
 
 const game = new Phaser.Game(config);

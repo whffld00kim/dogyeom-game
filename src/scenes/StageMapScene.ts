@@ -27,7 +27,7 @@ export default class StageMapScene extends Phaser.Scene {
       .text(DESIGN.width / 2, 56, '스테이지', { fontFamily: FONT, fontSize: '38px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
       .setOrigin(0.5);
     makeButton(this, DESIGN.width - 480, 56, 150, 58, '📕 도감', () => this.scene.start('Dex'), { bg: COLORS.btnGreen, fontSize: 25 });
-    makeButton(this, DESIGN.width - 320, 56, 150, 58, '🛍 상점', () => toast(this, '상점은 곧 추가됩니다!'), { bg: COLORS.tile, fontSize: 25 });
+    makeButton(this, DESIGN.width - 320, 56, 150, 58, '🛍 상점', () => this.scene.start('Shop'), { bg: COLORS.tile, fontSize: 25 });
     makeButton(this, DESIGN.width - 185, 56, 100, 58, '⚙', () => this.scene.start('Settings'), { fontSize: 28 });
 
     // 스테이지 노드 (해금된 것 + 앞으로 3개까지 표시)

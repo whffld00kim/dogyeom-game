@@ -15,6 +15,8 @@ export interface GameState {
   caught: number[]; // 잡은 포켓몬 id 목록
   caughtStages: number[]; // 이미 포획 보상을 준 스테이지 번호(중복 보상 방지)
   seenStory: string[]; // 이미 본 지역 스토리(지역명)
+  ownedItems: string[]; // 구매한 꾸미기 아이템 id
+  equipped: Record<string, string>; // 슬롯(hat/glasses/held) → 아이템 id
 }
 
 export function createDefault(): GameState {
@@ -27,6 +29,8 @@ export function createDefault(): GameState {
     caught: [],
     caughtStages: [],
     seenStory: [],
+    ownedItems: [],
+    equipped: {},
   };
 }
 
@@ -59,6 +63,8 @@ export async function loadState(): Promise<boolean> {
       if (!Array.isArray(merged.caught)) merged.caught = [];
       if (!Array.isArray(merged.caughtStages)) merged.caughtStages = [];
       if (!Array.isArray(merged.seenStory)) merged.seenStory = [];
+      if (!Array.isArray(merged.ownedItems)) merged.ownedItems = [];
+      if (!merged.equipped || typeof merged.equipped !== 'object') merged.equipped = {};
       merged.schemaVersion = SCHEMA_VERSION;
       Object.assign(gameState, merged);
     }
