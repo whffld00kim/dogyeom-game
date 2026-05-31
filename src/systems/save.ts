@@ -54,6 +54,13 @@ export async function loadState(): Promise<void> {
       merged.schemaVersion = SCHEMA_VERSION;
       Object.assign(gameState, merged);
     }
+    // 이미 클리어한 스테이지의 포켓몬을 도감에 소급 적용 (기존 진행 보정)
+    for (const k of Object.keys(gameState.stageStars)) {
+      const n = Number(k);
+      if (n >= 1 && n <= 1025 && (gameState.stageStars[n] ?? 0) > 0 && !gameState.caught.includes(n)) {
+        gameState.caught.push(n);
+      }
+    }
   } catch (e) {
     console.warn('[save] load 실패, 기본값 사용:', e);
   }
