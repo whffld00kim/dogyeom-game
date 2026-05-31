@@ -77,15 +77,17 @@ export function catchRandom(): number | null {
   return null;
 }
 
-/** 이미 클리어한 스테이지 수만큼 도감을 채워 보정(지역 순서대로 랜덤). 기존 진행 반영용. */
+/** 구버전 저장 1회 보정: 이미 클리어한 스테이지 수만큼 도감을 채우고 보상완료로 마킹. */
 export function reconcileCaught(): void {
-  const clearedCount = Object.keys(gameState.stageStars).filter(
-    (k) => (gameState.stageStars[Number(k)] ?? 0) > 0
-  ).length;
-  const target = Math.min(clearedCount, TOTAL);
+  const cleared = Object.keys(gameState.stageStars)
+    .map(Number)
+    .filter((n) => (gameState.stageStars[n] ?? 0) > 0)
+    .sort((a, b) => a - b);
   let guard = 0;
-  while (gameState.caught.length < target && guard < TOTAL) {
+  while (gameState.caught.length < Math.min(cleared.length, TOTAL) && guard < TOTAL) {
     if (catchRandom() === null) break;
     guard++;
   }
+  gameState.caughtStages = Array.from(new Set([...gameState.caughtStages, ...cleared]));
+  persist();
 }

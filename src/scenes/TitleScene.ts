@@ -48,7 +48,7 @@ export default class TitleScene extends Phaser.Scene {
 
     // 버전 표시(업데이트 적용 확인용)
     this.add
-      .text(18, DESIGN.height - 14, 'v10', { fontFamily: FONT, fontSize: '22px', color: '#2b3a67', resolution: TEXT_RES })
+      .text(18, DESIGN.height - 14, 'v11', { fontFamily: FONT, fontSize: '22px', color: '#2b3a67', resolution: TEXT_RES })
       .setOrigin(0, 1)
       .setAlpha(0.7);
   }

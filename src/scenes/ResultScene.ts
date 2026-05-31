@@ -5,24 +5,24 @@ import { BIOME_COLORS } from '../systems/stageGenerator';
 import { getName, placeholderColor } from '../systems/dex';
 
 export default class ResultScene extends Phaser.Scene {
-  private rdata!: { index: number; stars: number; reward: number; caught: number | null };
+  private rdata!: { index: number; stars: number; reward: number; caught: number | null; missedCatch?: boolean };
 
   constructor() {
     super('Result');
   }
 
-  init(data: { index: number; stars: number; reward: number; caught: number | null }) {
+  init(data: { index: number; stars: number; reward: number; caught: number | null; missedCatch?: boolean }) {
     this.rdata = data;
   }
 
   create() {
-    const { index, stars, reward, caught } = this.rdata;
+    const { index, stars, reward, caught, missedCatch } = this.rdata;
     drawBackground(this, BIOME_COLORS['초원']);
     addCoinHud(this);
 
     const hasCatch = caught != null;
     const pw = 660;
-    const ph = hasCatch ? 520 : 420;
+    const ph = hasCatch || missedCatch ? 520 : 420;
     const px = DESIGN.width / 2;
     const py = DESIGN.height / 2 + 10;
     const top = py - ph / 2;
@@ -64,6 +64,19 @@ export default class ResultScene extends Phaser.Scene {
           resolution: TEXT_RES,
         })
         .setOrigin(0, 0.5);
+    } else if (missedCatch) {
+      const cy = top + 290;
+      this.add
+        .text(px, cy, '아쉽다! 실수가 많아서 포켓몬을 놓쳤어요 😢\n다시 도전하면 잡을 수 있어요!', {
+          fontFamily: FONT,
+          fontSize: '26px',
+          color: '#e0556b',
+          fontStyle: 'bold',
+          align: 'center',
+          lineSpacing: 8,
+          resolution: TEXT_RES,
+        })
+        .setOrigin(0.5);
     }
 
     const by = py + ph / 2 - 56;

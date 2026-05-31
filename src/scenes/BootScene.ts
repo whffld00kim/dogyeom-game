@@ -20,8 +20,8 @@ export default class BootScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    loadState().then(() => {
-      reconcileCaught(); // 기존 클리어 진행을 도감에 보정
+    loadState().then((oldSave) => {
+      if (oldSave) reconcileCaught(); // 구버전 저장만 1회 보정
       this.scene.start('Title');
     });
   }

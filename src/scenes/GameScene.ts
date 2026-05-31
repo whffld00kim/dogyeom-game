@@ -4,7 +4,7 @@ import { drawBackground, makeButton, addCoinHud, toast } from '../widgets';
 import { makeStage, stageReward, BIOME_COLORS } from '../systems/stageGenerator';
 import type { Stage } from '../systems/stageGenerator';
 import { makeProblem } from '../systems/mathGenerator';
-import { gameState, recordStageClear } from '../systems/save';
+import { gameState, recordStageClear, persist } from '../systems/save';
 import { catchRandom } from '../systems/dex';
 import { TIME_SECONDS } from '../systems/settings';
 import type { Problem, Settings } from '../types';
@@ -276,8 +276,20 @@ export default class GameScene extends Phaser.Scene {
     if (this.settings.mode === 'challenge' && this.bonusLost) stars = Math.max(1, stars - 1);
     stars = Math.max(1, Math.min(3, stars));
     const reward = stageReward(this.settings);
-    const firstClear = recordStageClear(this.index, stars, reward);
-    const caught = firstClear ? catchRandom() : null;
-    this.scene.start('Result', { index: this.index, stars, reward, caught });
+    recordStageClear(this.index, stars, reward);
+
+    // 포획: 실수 1번까지 OK, 2번 이상이면 이번엔 실패(같은 스테이지 재도전 시 다시 기회)
+    let caught: number | null = null;
+    let missedCatch = false;
+    if (!gameState.caughtStages.includes(this.index)) {
+      if (this.mistakes <= 1) {
+        caught = catchRandom();
+        gameState.caughtStages.push(this.index);
+        persist();
+      } else {
+        missedCatch = true;
+      }
+    }
+    this.scene.start('Result', { index: this.index, stars, reward, caught, missedCatch });
   }
 }

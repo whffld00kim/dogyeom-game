@@ -2,7 +2,7 @@ import localforage from 'localforage';
 import type { Settings } from '../types';
 import { defaultSettings } from './settings';
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const KEY = 'dogyeom-save';
 const BACKUP_KEY = 'dogyeom-save-backup';
 
@@ -13,6 +13,7 @@ export interface GameState {
   stageStars: Record<number, number>; // 스테이지번호 → 별(1~3)
   maxUnlocked: number; // 해금된 최고 스테이지 번호
   caught: number[]; // 잡은 포켓몬 id 목록
+  caughtStages: number[]; // 이미 포획 보상을 준 스테이지 번호(중복 보상 방지)
 }
 
 export function createDefault(): GameState {
@@ -23,6 +24,7 @@ export function createDefault(): GameState {
     stageStars: {},
     maxUnlocked: 1,
     caught: [],
+    caughtStages: [],
   };
 }
 
@@ -32,10 +34,12 @@ export const gameState: GameState = createDefault();
 localforage.config({ name: 'dogyeom-game', storeName: 'save' });
 
 /** 부팅 시 1회: 저장된 상태를 메모리로 불러와 병합 */
-export async function loadState(): Promise<void> {
+export async function loadState(): Promise<boolean> {
+  let oldSave = false;
   try {
     const saved = await localforage.getItem<GameState>(KEY);
     if (saved && saved.schemaVersion) {
+      oldSave = (saved.schemaVersion || 0) < 3; // caughtStages 없던 구버전 → 1회 보정 필요
       // 기본값 위에 저장값을 덮어 누락 필드 보강
       const merged = { ...createDefault(), ...saved };
       merged.settings = { ...defaultSettings(), ...(saved.settings || {}) };
@@ -51,12 +55,14 @@ export async function loadState(): Promise<void> {
       });
       merged.settings.ops = ops;
       if (!Array.isArray(merged.caught)) merged.caught = [];
+      if (!Array.isArray(merged.caughtStages)) merged.caughtStages = [];
       merged.schemaVersion = SCHEMA_VERSION;
       Object.assign(gameState, merged);
     }
   } catch (e) {
     console.warn('[save] load 실패, 기본값 사용:', e);
   }
+  return oldSave;
 }
 
 let timer: ReturnType<typeof setTimeout> | null = null;
