@@ -14,6 +14,7 @@ export interface GameState {
   maxUnlocked: number; // 해금된 최고 스테이지 번호
   caught: number[]; // 잡은 포켓몬 id 목록
   caughtStages: number[]; // 이미 포획 보상을 준 스테이지 번호(중복 보상 방지)
+  seenStory: string[]; // 이미 본 지역 스토리(지역명)
 }
 
 export function createDefault(): GameState {
@@ -25,6 +26,7 @@ export function createDefault(): GameState {
     maxUnlocked: 1,
     caught: [],
     caughtStages: [],
+    seenStory: [],
   };
 }
 
@@ -56,6 +58,7 @@ export async function loadState(): Promise<boolean> {
       merged.settings.ops = ops;
       if (!Array.isArray(merged.caught)) merged.caught = [];
       if (!Array.isArray(merged.caughtStages)) merged.caughtStages = [];
+      if (!Array.isArray(merged.seenStory)) merged.seenStory = [];
       merged.schemaVersion = SCHEMA_VERSION;
       Object.assign(gameState, merged);
     }

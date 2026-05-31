@@ -3,6 +3,8 @@ import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, drawStars, toast } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState } from '../systems/save';
+import { currentRegion } from '../systems/dex';
+import { regionIntro } from '../systems/story';
 
 export default class StageMapScene extends Phaser.Scene {
   constructor() {
@@ -10,6 +12,13 @@ export default class StageMapScene extends Phaser.Scene {
   }
 
   create() {
+    // 새 지역에 처음 들어오면 지역 인트로 대사 1회 표시
+    const region = currentRegion();
+    if (!gameState.seenStory.includes(region.name)) {
+      this.scene.start('Dialogue', { lines: regionIntro(region.name), next: 'StageMap', seenKey: region.name });
+      return;
+    }
+
     drawBackground(this, BIOME_COLORS['숲']);
     addCoinHud(this);
 
