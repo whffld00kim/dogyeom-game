@@ -13,15 +13,13 @@ export default class StageMapScene extends Phaser.Scene {
     drawBackground(this, BIOME_COLORS['숲']);
     addCoinHud(this);
 
-    makeButton(this, 100, 56, 140, 58, '◀ 뒤로', () => this.scene.start('Title'), { fontSize: 26 });
+    makeButton(this, 110, 56, 150, 58, '◀ 뒤로', () => this.scene.start('Title'), { fontSize: 26 });
     this.add
-      .text(DESIGN.width / 2, 56, '스테이지', { fontFamily: FONT, fontSize: '40px', color: '#2b3a67', fontStyle: 'bold' })
+      .text(DESIGN.width / 2, 56, '스테이지', { fontFamily: FONT, fontSize: '38px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
       .setOrigin(0.5);
-    makeButton(this, DESIGN.width - 400, 56, 150, 58, '🛍 상점', () => toast(this, '상점은 곧 추가됩니다!'), {
-      bg: COLORS.tile,
-      fontSize: 26,
-    });
-    makeButton(this, DESIGN.width - 250, 56, 110, 58, '⚙', () => this.scene.start('Settings'), { fontSize: 28 });
+    makeButton(this, DESIGN.width - 480, 56, 150, 58, '📕 도감', () => this.scene.start('Dex'), { bg: COLORS.btnGreen, fontSize: 25 });
+    makeButton(this, DESIGN.width - 320, 56, 150, 58, '🛍 상점', () => toast(this, '상점은 곧 추가됩니다!'), { bg: COLORS.tile, fontSize: 25 });
+    makeButton(this, DESIGN.width - 185, 56, 100, 58, '⚙', () => this.scene.start('Settings'), { fontSize: 28 });
 
     // 스테이지 노드 (해금된 것 + 앞으로 3개까지 표시)
     const maxShow = Math.min(gameState.maxUnlocked + 3, 30);

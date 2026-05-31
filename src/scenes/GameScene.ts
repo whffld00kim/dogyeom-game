@@ -275,7 +275,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.settings.mode === 'challenge' && this.bonusLost) stars = Math.max(1, stars - 1);
     stars = Math.max(1, Math.min(3, stars));
     const reward = stageReward(this.settings);
-    recordStageClear(this.index, stars, reward);
-    this.scene.start('Result', { index: this.index, stars, reward });
+    const caught = recordStageClear(this.index, stars, reward);
+    this.scene.start('Result', { index: this.index, stars, reward, caught });
   }
 }

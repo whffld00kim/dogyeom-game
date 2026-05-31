@@ -12,6 +12,7 @@ export interface GameState {
   coins: number;
   stageStars: Record<number, number>; // 스테이지번호 → 별(1~3)
   maxUnlocked: number; // 해금된 최고 스테이지 번호
+  caught: number[]; // 잡은 포켓몬 id 목록
 }
 
 export function createDefault(): GameState {
@@ -21,6 +22,7 @@ export function createDefault(): GameState {
     coins: 0,
     stageStars: {},
     maxUnlocked: 1,
+    caught: [],
   };
 }
 
@@ -48,6 +50,7 @@ export async function loadState(): Promise<void> {
         };
       });
       merged.settings.ops = ops;
+      if (!Array.isArray(merged.caught)) merged.caught = [];
       merged.schemaVersion = SCHEMA_VERSION;
       Object.assign(gameState, merged);
     }
@@ -72,12 +75,20 @@ export function persist(): void {
 }
 
 /** 스테이지 클리어 기록: 별 갱신(최고치), 다음 스테이지 해금, 코인 지급 */
-export function recordStageClear(index: number, stars: number, reward: number): void {
+export function recordStageClear(index: number, stars: number, reward: number): number | null {
+  const wasFirstClear = (gameState.stageStars[index] ?? 0) === 0;
   const prev = gameState.stageStars[index] ?? 0;
   gameState.stageStars[index] = Math.max(prev, stars);
   if (index + 1 > gameState.maxUnlocked) gameState.maxUnlocked = index + 1;
   gameState.coins += reward;
+  // 스테이지 N 첫 클리어 → 포켓몬 #N 포획 (1~1025)
+  let caughtId: number | null = null;
+  if (wasFirstClear && index >= 1 && index <= 1025 && !gameState.caught.includes(index)) {
+    gameState.caught.push(index);
+    caughtId = index;
+  }
   persist();
+  return caughtId;
 }
 
 export function saveSettings(): void {

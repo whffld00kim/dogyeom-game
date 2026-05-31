@@ -6,6 +6,7 @@ import SettingsScene from './scenes/SettingsScene';
 import StageMapScene from './scenes/StageMapScene';
 import GameScene from './scenes/GameScene';
 import ResultScene from './scenes/ResultScene';
+import DexScene from './scenes/DexScene';
 import DebugScene from './scenes/DebugScene';
 
 // HiDPI 선명도: 캔버스를 기기 배율 그대로(최대 3x) 렌더 → 선·테두리까지 또렷. 게임 좌표는 1280x720 유지.
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
     zoom: HD,
   },
   render: { antialias: true },
-  scene: [BootScene, TitleScene, SettingsScene, StageMapScene, GameScene, ResultScene, DebugScene],
+  scene: [BootScene, TitleScene, SettingsScene, StageMapScene, GameScene, ResultScene, DexScene, DebugScene],
 };
 
 const game = new Phaser.Game(config);
