@@ -6,6 +6,7 @@ import SettingsScene from './scenes/SettingsScene';
 import StageMapScene from './scenes/StageMapScene';
 import GameScene from './scenes/GameScene';
 import ResultScene from './scenes/ResultScene';
+import DebugScene from './scenes/DebugScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -18,7 +19,7 @@ const config: Phaser.Types.Core.GameConfig = {
     height: DESIGN.height,
   },
   render: { antialias: true },
-  scene: [BootScene, TitleScene, SettingsScene, StageMapScene, GameScene, ResultScene],
+  scene: [BootScene, TitleScene, SettingsScene, StageMapScene, GameScene, ResultScene, DebugScene],
 };
 
 const game = new Phaser.Game(config);
