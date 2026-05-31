@@ -1,5 +1,5 @@
 import type { Settings, Op, Problem } from '../types';
-import { OP_SYMBOL } from './settings';
+import { OP_SYMBOL, ADD_SUB_PRESETS, MUL_DIV_PRESETS, clampPresetIndex } from './settings';
 
 function randInt(rng: () => number, min: number, max: number): number {
   if (max < min) [min, max] = [max, min];
@@ -26,34 +26,48 @@ export function enabledOps(s: Settings): Op[] {
 export function makeProblem(s: Settings, rng: () => number = Math.random): Problem {
   const ops = enabledOps(s);
   const op: Op = ops.length ? ops[Math.floor(rng() * ops.length)] : 'add';
-  const r = s.ops[op] ?? { min: 1, max: 9, enabled: true };
+  const idx = clampPresetIndex(op, s.ops[op]?.presetIndex ?? 0);
 
   let a: number, b: number, answer: number;
-  switch (op) {
-    case 'add':
-      a = randInt(rng, r.min, r.max);
-      b = randInt(rng, r.min, r.max);
-      answer = a + b;
-      break;
-    case 'sub':
-      a = randInt(rng, r.min, r.max);
-      b = randInt(rng, r.min, r.max);
-      if (a < b) [a, b] = [b, a]; // 음수 방지
-      answer = a - b;
-      break;
-    case 'mul':
-      a = randInt(rng, r.min, r.max);
-      b = randInt(rng, r.min, r.max);
-      answer = a * b;
-      break;
-    case 'div':
-    default: {
-      // 나누어떨어지게: 몫 q, 나누는 수 b → a = b*q
-      const q = randInt(rng, Math.max(1, r.min), r.max);
-      b = randInt(rng, Math.max(1, r.min), r.max);
-      a = b * q;
-      answer = q;
-      break;
+  if (op === 'add' || op === 'sub') {
+    const max = ADD_SUB_PRESETS[idx].max;
+    a = randInt(rng, 1, max);
+    b = randInt(rng, 1, max);
+    if (op === 'sub' && a < b) [a, b] = [b, a]; // 음수 방지
+    answer = op === 'add' ? a + b : a - b;
+  } else {
+    const p = MUL_DIV_PRESETS[idx];
+    if (p.kind === 'dan') {
+      // 단 모드: '단'은 danMin~danMax, 나머지 한 수는 1~9 (구구단 방식)
+      const dan = randInt(rng, p.danMin, p.danMax);
+      const other = randInt(rng, 1, 9);
+      if (op === 'mul') {
+        if (rng() < 0.5) {
+          a = dan;
+          b = other;
+        } else {
+          a = other;
+          b = dan;
+        }
+        answer = a * b;
+      } else {
+        // 나눗셈: 나누는 수 = 단, 몫 = 1~9 → a ÷ b 가 나누어떨어짐
+        b = dan;
+        answer = other;
+        a = b * answer;
+      }
+    } else {
+      // 범위 모드 (1~max)
+      if (op === 'mul') {
+        a = randInt(rng, 1, p.max);
+        b = randInt(rng, 1, p.max);
+        answer = a * b;
+      } else {
+        // 나눗셈: 나누는 수는 한 자리(2~9)로 제한, 몫은 1~max → 항상 나누어떨어짐
+        b = randInt(rng, 2, 9);
+        answer = randInt(rng, 1, p.max);
+        a = b * answer;
+      }
     }
   }
 

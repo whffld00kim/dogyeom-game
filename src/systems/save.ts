@@ -2,7 +2,7 @@ import localforage from 'localforage';
 import type { Settings } from '../types';
 import { defaultSettings } from './settings';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const KEY = 'dogyeom-save';
 const BACKUP_KEY = 'dogyeom-save-backup';
 
@@ -37,7 +37,18 @@ export async function loadState(): Promise<void> {
       // 기본값 위에 저장값을 덮어 누락 필드 보강
       const merged = { ...createDefault(), ...saved };
       merged.settings = { ...defaultSettings(), ...(saved.settings || {}) };
-      merged.settings.ops = { ...defaultSettings().ops, ...(saved.settings?.ops || {}) };
+      // ops: 기본값 기준으로 enabled / presetIndex 만 안전 복원 (구버전 min/max 는 무시)
+      const defOps = defaultSettings().ops;
+      const ops = {} as typeof defOps;
+      (Object.keys(defOps) as (keyof typeof defOps)[]).forEach((op) => {
+        const so = (saved.settings?.ops as Record<string, { enabled?: boolean; presetIndex?: number }>)?.[op] ?? {};
+        ops[op] = {
+          enabled: typeof so.enabled === 'boolean' ? so.enabled : defOps[op].enabled,
+          presetIndex: Number.isInteger(so.presetIndex) ? (so.presetIndex as number) : 0,
+        };
+      });
+      merged.settings.ops = ops;
+      merged.schemaVersion = SCHEMA_VERSION;
       Object.assign(gameState, merged);
     }
   } catch (e) {

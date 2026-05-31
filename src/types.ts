@@ -7,8 +7,7 @@ export type TimeLevel = 'easy' | 'normal' | 'hard';
 
 export interface OpSetting {
   enabled: boolean;
-  min: number; // 피연산자 최소
-  max: number; // 피연산자 최대
+  presetIndex: number; // 해당 연산의 프리셋 목록에서의 인덱스(범위/단 설정)
 }
 
 export interface Settings {

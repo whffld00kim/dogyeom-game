@@ -4,7 +4,7 @@ import { TEXT_RES } from '../theme';
 import { drawBackground, makeButton, ButtonContainer } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState, saveSettings } from '../systems/save';
-import { OP_LABEL, cycleRange } from '../systems/settings';
+import { OP_LABEL, presetLabel, presetCount } from '../systems/settings';
 import type { Op } from '../types';
 
 export default class SettingsScene extends Phaser.Scene {
@@ -33,7 +33,7 @@ export default class SettingsScene extends Phaser.Scene {
       const refresh = () => {
         onoff.setLabel(s.ops[op].enabled ? '켜짐' : '꺼짐');
         onoff.setBg(s.ops[op].enabled ? COLORS.btnGreen : COLORS.btnGray);
-        range.setLabel(`1 ~ ${s.ops[op].max}`);
+        range.setLabel(presetLabel(op, s.ops[op].presetIndex));
         range.setAlpha(s.ops[op].enabled ? 1 : 0.35);
       };
       onoff = makeButton(this, 400, y, 140, 56, '', () => {
@@ -41,9 +41,9 @@ export default class SettingsScene extends Phaser.Scene {
         refresh();
         saveSettings();
       }, { fontSize: 26 });
-      range = makeButton(this, 640, y, 200, 56, '', () => {
+      range = makeButton(this, 645, y, 210, 56, '', () => {
         if (!s.ops[op].enabled) return;
-        s.ops[op].max = cycleRange(s.ops[op].max);
+        s.ops[op].presetIndex = (s.ops[op].presetIndex + 1) % presetCount(op);
         refresh();
         saveSettings();
       }, { bg: COLORS.btn, fontSize: 26 });
