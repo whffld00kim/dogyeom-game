@@ -6,6 +6,7 @@ import type { Stage } from '../systems/stageGenerator';
 import { makeProblem } from '../systems/mathGenerator';
 import { gameState, recordStageClear, persist } from '../systems/save';
 import { catchRandom } from '../systems/dex';
+import { playCorrect, playWrong } from '../systems/music';
 import { TIME_SECONDS } from '../systems/settings';
 import type { Problem, Settings } from '../types';
 
@@ -28,7 +29,9 @@ export default class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Container;
   private enemy!: Phaser.GameObjects.Container;
   private answerLayer!: Phaser.GameObjects.Container;
-  private timerBar?: Phaser.GameObjects.Rectangle;
+  private timerFill?: Phaser.GameObjects.Rectangle;
+  private timerText?: Phaser.GameObjects.Text;
+  private timerTween?: Phaser.Tweens.Tween;
 
   constructor() {
     super('Game');
@@ -212,6 +215,7 @@ export default class GameScene extends Phaser.Scene {
     if (value === this.current.answer) {
       this.accepting = false;
       this.stopTimer();
+      playCorrect();
       this.feedback.setText('정답이야! 🎉').setColor('#2e9e4f');
       if (paint) paint(COLORS.good);
       // 공격 → 적 처치
@@ -222,6 +226,7 @@ export default class GameScene extends Phaser.Scene {
       this.time.delayedCall(640, () => this.nextProblem());
     } else {
       this.mistakes++;
+      playWrong();
       this.feedback.setText('다시 해볼까? 🤔').setColor('#e0556b');
       if (tile) {
         const ox = tile.x;
@@ -242,31 +247,51 @@ export default class GameScene extends Phaser.Scene {
   private startTimer() {
     if (this.settings.mode !== 'challenge') return;
     const secs = TIME_SECONDS[this.settings.timeLevel];
-    const w = 520;
-    this.timerBar = this.add.rectangle(DESIGN.width / 2 - w / 2, 160, w, 14, COLORS.coin).setOrigin(0, 0.5);
-    this.answerLayer.add(this.timerBar);
-    this.tweens.add({
-      targets: this.timerBar,
+    const w = 440;
+    const x = DESIGN.width / 2;
+    const y = 174;
+    // 트랙(배경)
+    const track = this.add.graphics();
+    track.fillStyle(0x000000, 0.18);
+    track.fillRoundedRect(x - w / 2, y - 14, w, 28, 14);
+    this.answerLayer.add(track);
+    // 시계 아이콘
+    const clock = this.add.text(x - w / 2 - 36, y, '⏱', { fontSize: '34px' }).setOrigin(0.5);
+    this.answerLayer.add(clock);
+    // 채워진 막대 (줄어듦)
+    this.timerFill = this.add.rectangle(x - w / 2 + 3, y, w - 6, 20, COLORS.good).setOrigin(0, 0.5);
+    this.answerLayer.add(this.timerFill);
+    // 남은 초
+    this.timerText = this.add
+      .text(x + w / 2 + 34, y, `${secs}`, { fontFamily: FONT, fontSize: '32px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
+      .setOrigin(0.5);
+    this.answerLayer.add(this.timerText);
+
+    this.timerTween = this.tweens.add({
+      targets: this.timerFill,
       scaleX: { from: 1, to: 0 },
       duration: secs * 1000,
       ease: 'Linear',
+      onUpdate: (tw) => {
+        const p = tw.progress;
+        if (this.timerText) this.timerText.setText(`${Math.ceil(secs * (1 - p))}`);
+        if (this.timerFill) this.timerFill.setFillStyle(p < 0.55 ? COLORS.good : p < 0.8 ? COLORS.coin : COLORS.bad);
+      },
       onComplete: () => {
         this.bonusLost = true;
-        if (this.timerBar) {
-          this.timerBar.destroy();
-          this.timerBar = undefined;
-        }
+        if (this.timerText) this.timerText.setText('0');
         toast(this, '시간 초과! 천천히 풀어도 괜찮아 😊');
       },
     });
   }
 
   private stopTimer() {
-    if (this.timerBar) {
-      this.tweens.killTweensOf(this.timerBar);
-      this.timerBar.destroy();
-      this.timerBar = undefined;
+    if (this.timerTween) {
+      this.timerTween.stop();
+      this.timerTween = undefined;
     }
+    this.timerFill = undefined;
+    this.timerText = undefined;
   }
 
   private clearStage() {

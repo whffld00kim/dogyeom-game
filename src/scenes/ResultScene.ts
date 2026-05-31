@@ -3,6 +3,7 @@ import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, drawStars } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { getName, placeholderColor } from '../systems/dex';
+import { playCatch } from '../systems/music';
 
 export default class ResultScene extends Phaser.Scene {
   private rdata!: { index: number; stars: number; reward: number; caught: number | null; missedCatch?: boolean };
@@ -21,6 +22,7 @@ export default class ResultScene extends Phaser.Scene {
     addCoinHud(this);
 
     const hasCatch = caught != null;
+    if (hasCatch) playCatch();
     const pw = 660;
     const ph = hasCatch || missedCatch ? 520 : 420;
     const px = DESIGN.width / 2;
