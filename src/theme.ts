@@ -32,3 +32,6 @@ export const COLORS = {
 };
 
 export const GROUND_Y = Math.round(DESIGN.height * 0.74); // 지면 기준선 y
+
+// HiDPI 태블릿에서 캔버스 텍스트가 흐릿해 보이는 것 방지 (텍스트를 기기 배율로 렌더)
+export const TEXT_RES = Math.max(2, Math.min(3, (typeof window !== 'undefined' && window.devicePixelRatio) || 2));

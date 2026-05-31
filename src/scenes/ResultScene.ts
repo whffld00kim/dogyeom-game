@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DESIGN, FONT, COLORS } from '../theme';
+import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, drawStars } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 
@@ -37,6 +37,7 @@ export default class ResultScene extends Phaser.Scene {
         fontSize: '46px',
         color: '#2b3a67',
         fontStyle: 'bold',
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5);
 
@@ -45,7 +46,7 @@ export default class ResultScene extends Phaser.Scene {
     this.tweens.add({ targets: starGroup, scale: 1, duration: 450, ease: 'Back.easeOut' });
 
     this.add
-      .text(px, py + 55, `+${reward}  🪙`, { fontFamily: FONT, fontSize: '50px', color: '#2b3a67', fontStyle: 'bold' })
+      .text(px, py + 55, `+${reward}  🪙`, { fontFamily: FONT, fontSize: '50px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
       .setOrigin(0.5);
 
     makeButton(this, px - 185, py + 145, 160, 72, '↻ 다시', () => this.scene.start('Game', { index }), {

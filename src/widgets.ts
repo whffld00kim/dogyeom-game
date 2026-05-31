@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { FONT, COLORS, DESIGN } from './theme';
+import { FONT, COLORS, DESIGN, TEXT_RES } from './theme';
 import { gameState } from './systems/save';
 
 type Scene = Phaser.Scene;
@@ -41,16 +41,18 @@ export function makeButton(
   };
   draw(bg);
   const t = scene.add
-    .text(0, 0, label, { fontFamily: FONT, fontSize: `${fontSize}px`, color, fontStyle: 'bold', align: 'center' })
+    .text(0, 0, label, { fontFamily: FONT, fontSize: `${fontSize}px`, color, fontStyle: 'bold', align: 'center', resolution: TEXT_RES })
     .setOrigin(0.5);
   c.add([g, t]);
   c.setSize(w, h);
   c.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
-  c.on('pointerdown', () => c.setScale(0.95));
-  c.on('pointerup', () => {
-    c.setScale(1);
+  // 터치 신뢰성: pointerup 은 손가락이 살짝만 움직여도 버튼 밖에서 발생해 클릭이 누락됨
+  // → 누르는 즉시(pointerdown) 실행해 한 번에 반응. (큰 버튼 UI라 오발 위험 적음)
+  c.on('pointerdown', () => {
+    c.setScale(0.94);
     onClick();
   });
+  c.on('pointerup', () => c.setScale(1));
   c.on('pointerout', () => c.setScale(1));
   c.setLabel = (s: string) => t.setText(s);
   c.setBg = (f: number) => draw(f);
@@ -94,7 +96,7 @@ export function drawStars(
 
 export function addCoinHud(scene: Scene, x = DESIGN.width - 40, y = 46): Phaser.GameObjects.Text {
   return scene.add
-    .text(x, y, `🪙 ${gameState.coins}`, { fontFamily: FONT, fontSize: '34px', color: '#2b3a67', fontStyle: 'bold' })
+    .text(x, y, `🪙 ${gameState.coins}`, { fontFamily: FONT, fontSize: '34px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
     .setOrigin(1, 0.5)
     .setDepth(50);
 }
@@ -108,7 +110,7 @@ export function toast(scene: Scene, msg: string): void {
   g.fillStyle(0x2b3a67, 0.92);
   g.fillRoundedRect(-w / 2, -30, w, 60, 18);
   const t = scene.add
-    .text(0, 0, msg, { fontFamily: FONT, fontSize: '28px', color: '#ffffff', fontStyle: 'bold' })
+    .text(0, 0, msg, { fontFamily: FONT, fontSize: '28px', color: '#ffffff', fontStyle: 'bold', resolution: TEXT_RES })
     .setOrigin(0.5);
   c.add([g, t]);
   c.setDepth(1000);

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DESIGN, FONT, COLORS } from '../theme';
+import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, drawStars, toast } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState } from '../systems/save';
@@ -47,7 +47,7 @@ export default class StageMapScene extends Phaser.Scene {
     const circ = this.add.circle(0, 0, 46, unlocked ? COLORS.panel : COLORS.lock);
     circ.setStrokeStyle(5, 0xffffff);
     const label = this.add
-      .text(0, 0, unlocked ? `${n}` : '🔒', { fontFamily: FONT, fontSize: '34px', color: '#ffffff', fontStyle: 'bold' })
+      .text(0, 0, unlocked ? `${n}` : '🔒', { fontFamily: FONT, fontSize: '34px', color: '#ffffff', fontStyle: 'bold', resolution: TEXT_RES })
       .setOrigin(0.5);
     c.add([circ, label]);
 
@@ -59,11 +59,11 @@ export default class StageMapScene extends Phaser.Scene {
     if (unlocked) {
       c.setSize(92, 92);
       c.setInteractive(new Phaser.Geom.Circle(0, 0, 46), Phaser.Geom.Circle.Contains);
-      c.on('pointerdown', () => c.setScale(0.94));
-      c.on('pointerup', () => {
-        c.setScale(1);
+      c.on('pointerdown', () => {
+        c.setScale(0.94);
         this.scene.start('Game', { index: n });
       });
+      c.on('pointerup', () => c.setScale(1));
       c.on('pointerout', () => c.setScale(1));
     }
   }

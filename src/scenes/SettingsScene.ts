@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DESIGN, FONT, COLORS } from '../theme';
+import { TEXT_RES } from '../theme';
 import { drawBackground, makeButton, ButtonContainer } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState, saveSettings } from '../systems/save';
@@ -16,7 +17,7 @@ export default class SettingsScene extends Phaser.Scene {
     const s = gameState.settings;
 
     this.add
-      .text(DESIGN.width / 2, 50, '수학 설정', { fontFamily: FONT, fontSize: '46px', color: '#2b3a67', fontStyle: 'bold' })
+      .text(DESIGN.width / 2, 50, '수학 설정', { fontFamily: FONT, fontSize: '46px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
       .setOrigin(0.5);
 
     // 연산별 켜기/끄기 + 범위
@@ -24,7 +25,7 @@ export default class SettingsScene extends Phaser.Scene {
     ops.forEach((op, i) => {
       const y = 130 + i * 70;
       this.add
-        .text(160, y, OP_LABEL[op], { fontFamily: FONT, fontSize: '32px', color: '#2b3a67', fontStyle: 'bold' })
+        .text(160, y, OP_LABEL[op], { fontFamily: FONT, fontSize: '32px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
         .setOrigin(0, 0.5);
 
       let onoff: ButtonContainer;
@@ -74,6 +75,7 @@ export default class SettingsScene extends Phaser.Scene {
         color: '#2b3a67',
         align: 'center',
         lineSpacing: 8,
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5);
 
@@ -92,7 +94,7 @@ export default class SettingsScene extends Phaser.Scene {
     get: () => string,
     set: (k: string) => void
   ) {
-    this.add.text(x, y, title, { fontFamily: FONT, fontSize: '30px', color: '#2b3a67', fontStyle: 'bold' }).setOrigin(0, 0.5);
+    this.add.text(x, y, title, { fontFamily: FONT, fontSize: '30px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES }).setOrigin(0, 0.5);
     const btns: ButtonContainer[] = [];
     const refresh = () => btns.forEach((b, i) => b.setBg(get() === items[i].k ? COLORS.btnGreen : COLORS.btnGray));
     items.forEach((it, i) => {

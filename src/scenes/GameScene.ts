@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DESIGN, FONT, COLORS, GROUND_Y } from '../theme';
+import { DESIGN, FONT, COLORS, GROUND_Y, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, toast } from '../widgets';
 import { makeStage, stageReward, BIOME_COLORS } from '../systems/stageGenerator';
 import type { Stage } from '../systems/stageGenerator';
@@ -67,7 +67,7 @@ export default class GameScene extends Phaser.Scene {
     bg.lineStyle(4, COLORS.panel, 1);
     bg.strokeRoundedRect(DESIGN.width / 2 - 235, 56, 470, 86, 24);
     this.bannerText = this.add
-      .text(DESIGN.width / 2, 99, '', { fontFamily: FONT, fontSize: '52px', color: '#2b3a67', fontStyle: 'bold' })
+      .text(DESIGN.width / 2, 99, '', { fontFamily: FONT, fontSize: '52px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
       .setOrigin(0.5);
 
     // 캐릭터 / 적
@@ -77,7 +77,7 @@ export default class GameScene extends Phaser.Scene {
 
     // 피드백
     this.feedback = this.add
-      .text(DESIGN.width / 2, 210, '', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: '#2b3a67' })
+      .text(DESIGN.width / 2, 210, '', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: '#2b3a67', resolution: TEXT_RES })
       .setOrigin(0.5)
       .setDepth(20);
 
@@ -147,16 +147,16 @@ export default class GameScene extends Phaser.Scene {
       };
       paint(COLORS.tile);
       const t = this.add
-        .text(0, 0, `${val}`, { fontFamily: FONT, fontSize: '46px', color: '#ffffff', fontStyle: 'bold' })
+        .text(0, 0, `${val}`, { fontFamily: FONT, fontSize: '46px', color: '#ffffff', fontStyle: 'bold', resolution: TEXT_RES })
         .setOrigin(0.5);
       tile.add([g, t]);
       tile.setSize(170, 84);
       tile.setInteractive(new Phaser.Geom.Rectangle(-85, -42, 170, 84), Phaser.Geom.Rectangle.Contains);
-      tile.on('pointerdown', () => tile.setScale(0.95));
-      tile.on('pointerup', () => {
-        tile.setScale(1);
+      tile.on('pointerdown', () => {
+        tile.setScale(0.95);
         this.onAnswer(val, tile, paint);
       });
+      tile.on('pointerup', () => tile.setScale(1));
       tile.on('pointerout', () => tile.setScale(1));
       this.answerLayer.add(tile);
     });

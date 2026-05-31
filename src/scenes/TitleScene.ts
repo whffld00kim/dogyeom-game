@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DESIGN, FONT, COLORS } from '../theme';
+import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 
@@ -27,7 +27,7 @@ export default class TitleScene extends Phaser.Scene {
 
     // 타이틀
     this.add
-      .text(DESIGN.width / 2, 120, '도겸이의', { fontFamily: FONT, fontSize: '40px', color: '#2b3a67', fontStyle: 'bold' })
+      .text(DESIGN.width / 2, 120, '도겸이의', { fontFamily: FONT, fontSize: '40px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
       .setOrigin(0.5);
     this.add
       .text(DESIGN.width / 2, 190, '포켓몬 수학모험', {
@@ -35,6 +35,7 @@ export default class TitleScene extends Phaser.Scene {
         fontSize: '76px',
         color: '#2b3a67',
         fontStyle: 'bold',
+        resolution: TEXT_RES,
       })
       .setOrigin(0.5);
 
