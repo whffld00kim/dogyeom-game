@@ -8,8 +8,8 @@ import GameScene from './scenes/GameScene';
 import ResultScene from './scenes/ResultScene';
 import DebugScene from './scenes/DebugScene';
 
-// HiDPI 선명도: 캔버스를 기기 배율(최대 2x)로 렌더 → 흐릿함 해결. 게임 좌표는 1280x720 유지.
-const HD = Math.min(2, Math.max(1, Math.round((typeof window !== 'undefined' && window.devicePixelRatio) || 1)));
+// HiDPI 선명도: 캔버스를 기기 배율 그대로(최대 3x) 렌더 → 선·테두리까지 또렷. 게임 좌표는 1280x720 유지.
+const HD = Math.min(3, Math.max(1, (typeof window !== 'undefined' && window.devicePixelRatio) || 1));
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
