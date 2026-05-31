@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DESIGN, FONT } from '../theme';
 import { loadState } from '../systems/save';
+import { reconcileCaught } from '../systems/dex';
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
@@ -19,6 +20,9 @@ export default class BootScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    loadState().then(() => this.scene.start('Title'));
+    loadState().then(() => {
+      reconcileCaught(); // 기존 클리어 진행을 도감에 보정
+      this.scene.start('Title');
+    });
   }
 }

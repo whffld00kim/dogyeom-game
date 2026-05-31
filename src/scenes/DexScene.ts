@@ -3,7 +3,7 @@ import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState } from '../systems/save';
-import { getName, placeholderColor, TOTAL } from '../systems/dex';
+import { getName, placeholderColor, TOTAL, currentRegion } from '../systems/dex';
 
 export default class DexScene extends Phaser.Scene {
   constructor() {
@@ -21,7 +21,7 @@ export default class DexScene extends Phaser.Scene {
 
     const caught = gameState.caught.slice().sort((a, b) => a - b);
     this.add
-      .text(DESIGN.width / 2, 108, `${caught.length} / ${TOTAL} 마리`, { fontFamily: FONT, fontSize: '26px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
+      .text(DESIGN.width / 2, 108, `${currentRegion().name} 지역 · ${caught.length} / ${TOTAL} 마리`, { fontFamily: FONT, fontSize: '26px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
       .setOrigin(0.5);
 
     const topY = 150;

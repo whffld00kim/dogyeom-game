@@ -5,6 +5,7 @@ import { makeStage, stageReward, BIOME_COLORS } from '../systems/stageGenerator'
 import type { Stage } from '../systems/stageGenerator';
 import { makeProblem } from '../systems/mathGenerator';
 import { gameState, recordStageClear } from '../systems/save';
+import { catchRandom } from '../systems/dex';
 import { TIME_SECONDS } from '../systems/settings';
 import type { Problem, Settings } from '../types';
 
@@ -275,7 +276,8 @@ export default class GameScene extends Phaser.Scene {
     if (this.settings.mode === 'challenge' && this.bonusLost) stars = Math.max(1, stars - 1);
     stars = Math.max(1, Math.min(3, stars));
     const reward = stageReward(this.settings);
-    const caught = recordStageClear(this.index, stars, reward);
+    const firstClear = recordStageClear(this.index, stars, reward);
+    const caught = firstClear ? catchRandom() : null;
     this.scene.start('Result', { index: this.index, stars, reward, caught });
   }
 }
