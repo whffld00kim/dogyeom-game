@@ -5,7 +5,7 @@ import { makeStage, stageReward, BIOME_COLORS } from '../systems/stageGenerator'
 import type { Stage } from '../systems/stageGenerator';
 import { makeProblem } from '../systems/mathGenerator';
 import { gameState, recordStageClear, persist } from '../systems/save';
-import { catchRandom } from '../systems/dex';
+import { catchRandom, addAsh } from '../systems/dex';
 import { playCorrect, playWrong } from '../systems/music';
 import { TIME_SECONDS } from '../systems/settings';
 import type { Problem, Settings } from '../types';
@@ -26,7 +26,7 @@ export default class GameScene extends Phaser.Scene {
   private feedback!: Phaser.GameObjects.Text;
   private progressFill!: Phaser.GameObjects.Rectangle;
   private progressW = 900;
-  private player!: Phaser.GameObjects.Container;
+  private player!: Phaser.GameObjects.Image | Phaser.GameObjects.Container;
   private enemy!: Phaser.GameObjects.Container;
   private answerLayer!: Phaser.GameObjects.Container;
   private timerFill?: Phaser.GameObjects.Rectangle;
@@ -75,8 +75,8 @@ export default class GameScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     // 캐릭터 / 적
-    this.player = this.makeCreature(260, GROUND_Y - 50, COLORS.player, false);
-    this.tweens.add({ targets: this.player, y: this.player.y - 12, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.player = addAsh(this, 260, GROUND_Y - 48, 118) as Phaser.GameObjects.Image | Phaser.GameObjects.Container;
+    this.tweens.add({ targets: this.player, y: GROUND_Y - 60, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.enemy = this.makeCreature(1360, GROUND_Y - 50, COLORS.enemy, true);
 
     // 피드백

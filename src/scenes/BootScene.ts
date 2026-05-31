@@ -9,6 +9,10 @@ export default class BootScene extends Phaser.Scene {
     super('Boot');
   }
 
+  preload() {
+    this.load.image('ash', 'sprites/ash.png'); // 주인공 지우 (없으면 도형으로 대체)
+  }
+
   create() {
     this.cameras.main.setBackgroundColor('#8fd3ff');
     this.add.text(DESIGN.width / 2, DESIGN.height / 2 - 30, '🐲', { fontSize: '96px' }).setOrigin(0.5);

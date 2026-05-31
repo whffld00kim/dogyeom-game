@@ -3,6 +3,7 @@ import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState, persist } from '../systems/save';
+import { addAsh } from '../systems/dex';
 import type { Line } from '../systems/story';
 
 export default class DialogueScene extends Phaser.Scene {
@@ -29,19 +30,8 @@ export default class DialogueScene extends Phaser.Scene {
   create() {
     drawBackground(this, BIOME_COLORS['숲']);
 
-    // 지우 아바타 (임시 — 실제 스프라이트는 APK 단계에서)
-    const ax = 165;
-    const ay = 345;
-    const face = this.add.circle(ax, ay, 72, 0xffd2a6);
-    face.setStrokeStyle(5, 0xffffff);
-    this.add.circle(ax, ay - 48, 64, 0xee5544); // 빨간 모자 돔
-    const brim = this.add.graphics();
-    brim.fillStyle(0xee5544, 1);
-    brim.fillRoundedRect(ax + 30, ay - 36, 76, 20, 10); // 모자 챙
-    this.add.circle(ax - 24, ay + 18, 9, 0x222222); // 눈
-    this.add.circle(ax + 24, ay + 18, 9, 0x222222);
-    this.add.circle(ax - 40, ay + 34, 9, 0xff9aa2); // 볼
-    this.add.circle(ax + 40, ay + 34, 9, 0xff9aa2);
+    // 주인공 지우 (스프라이트 없으면 도형으로 대체)
+    addAsh(this, 170, 340, 175);
 
     // 대사 상자
     const bx = 60;

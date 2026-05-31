@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
+import { addAsh } from '../systems/dex';
 
 export default class TitleScene extends Phaser.Scene {
   constructor() {
@@ -12,18 +13,9 @@ export default class TitleScene extends Phaser.Scene {
     drawBackground(this, BIOME_COLORS['숲']);
     addCoinHud(this);
 
-    // 마스코트(임시 도형)
-    const hero = this.add.container(DESIGN.width / 2, 470);
-    const body = this.add.circle(0, 0, 64, COLORS.player);
-    body.setStrokeStyle(6, 0xffffff);
-    const eyeL = this.add.circle(-22, -10, 15, 0xffffff);
-    const eyeR = this.add.circle(22, -10, 15, 0xffffff);
-    const pupL = this.add.circle(-20, -8, 7, 0x222222);
-    const pupR = this.add.circle(24, -8, 7, 0x222222);
-    const cheekL = this.add.circle(-34, 14, 8, 0xff9aa2);
-    const cheekR = this.add.circle(34, 14, 8, 0xff9aa2);
-    hero.add([body, cheekL, cheekR, eyeL, eyeR, pupL, pupR]);
-    this.tweens.add({ targets: hero, y: hero.y - 16, duration: 720, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    // 주인공 지우 (스프라이트 없으면 도형으로 대체)
+    const hero = addAsh(this, DESIGN.width / 2, 470, 150);
+    this.tweens.add({ targets: hero, y: 454, duration: 720, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
     // 타이틀
     this.add
@@ -48,7 +40,7 @@ export default class TitleScene extends Phaser.Scene {
 
     // 버전 표시(업데이트 적용 확인용)
     this.add
-      .text(18, DESIGN.height - 14, 'v16', { fontFamily: FONT, fontSize: '22px', color: '#2b3a67', resolution: TEXT_RES })
+      .text(18, DESIGN.height - 14, 'v17', { fontFamily: FONT, fontSize: '22px', color: '#2b3a67', resolution: TEXT_RES })
       .setOrigin(0, 1)
       .setAlpha(0.7);
   }

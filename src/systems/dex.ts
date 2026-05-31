@@ -48,6 +48,29 @@ export function loadPokeSprites(scene: Phaser.Scene, ids: number[], done: () => 
   scene.load.start();
 }
 
+/** 주인공 지우 아이콘: 스프라이트가 있으면 이미지, 없으면 빨간모자 캐릭터(placeholder). */
+export function addAsh(scene: Phaser.Scene, x: number, y: number, size: number): Phaser.GameObjects.GameObject {
+  if (scene.textures.exists('ash')) {
+    const img = scene.add.image(x, y, 'ash');
+    img.setScale(size / Math.max(img.width, img.height));
+    return img;
+  }
+  const c = scene.add.container(x, y);
+  const r = size * 0.44;
+  const face = scene.add.circle(0, 0, r, 0xffd2a6);
+  face.setStrokeStyle(Math.max(3, size * 0.045), 0xffffff);
+  const cap = scene.add.circle(0, -r * 0.62, r * 0.86, 0xee5544);
+  c.add([
+    face,
+    cap,
+    scene.add.circle(-r * 0.3, r * 0.08, r * 0.13, 0x222222),
+    scene.add.circle(r * 0.3, r * 0.08, r * 0.13, 0x222222),
+    scene.add.circle(-r * 0.5, r * 0.42, r * 0.12, 0xff9aa2),
+    scene.add.circle(r * 0.5, r * 0.42, r * 0.12, 0xff9aa2),
+  ]);
+  return c;
+}
+
 /** 포켓몬 아이콘 생성: 스프라이트가 있으면 이미지, 없으면 색 원(placeholder). */
 export function addPokeIcon(scene: Phaser.Scene, x: number, y: number, id: number, size: number): Phaser.GameObjects.GameObject {
   if (scene.textures.exists(pokeKey(id))) {
