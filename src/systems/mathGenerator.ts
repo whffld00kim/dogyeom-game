@@ -29,12 +29,19 @@ export function makeProblem(s: Settings, rng: () => number = Math.random): Probl
   const idx = clampPresetIndex(op, s.ops[op]?.presetIndex ?? 0);
 
   let a: number, b: number, answer: number;
-  if (op === 'add' || op === 'sub') {
+  if (op === 'add') {
+    // 답(합)이 1~max 범위에 들어오도록: 합을 먼저 정하고 두 수로 분해
     const max = ADD_SUB_PRESETS[idx].max;
-    a = randInt(rng, 1, max);
-    b = randInt(rng, 1, max);
-    if (op === 'sub' && a < b) [a, b] = [b, a]; // 음수 방지
-    answer = op === 'add' ? a + b : a - b;
+    const sum = randInt(rng, 2, max);
+    a = randInt(rng, 1, sum - 1);
+    b = sum - a;
+    answer = sum;
+  } else if (op === 'sub') {
+    // 답(차)이 1~max 범위, 음수 없음
+    const max = ADD_SUB_PRESETS[idx].max;
+    a = randInt(rng, 2, max);
+    b = randInt(rng, 1, a - 1);
+    answer = a - b;
   } else {
     const p = MUL_DIV_PRESETS[idx];
     if (p.kind === 'dan') {
@@ -57,13 +64,21 @@ export function makeProblem(s: Settings, rng: () => number = Math.random): Probl
         a = b * answer;
       }
     } else {
-      // 범위 모드 (1~max)
+      // 범위 모드 (답이 1~max)
       if (op === 'mul') {
-        a = randInt(rng, 1, p.max);
-        b = randInt(rng, 1, p.max);
+        // 한 인수는 한 자리(2~9), 다른 인수는 곱이 max 이하가 되도록 → 답(곱)이 1~max
+        const f1 = randInt(rng, 2, 9);
+        const f2 = randInt(rng, 1, Math.max(1, Math.floor(p.max / f1)));
+        if (rng() < 0.5) {
+          a = f1;
+          b = f2;
+        } else {
+          a = f2;
+          b = f1;
+        }
         answer = a * b;
       } else {
-        // 나눗셈: 나누는 수는 한 자리(2~9)로 제한, 몫은 1~max → 항상 나누어떨어짐
+        // 나눗셈: 나누는 수는 한 자리(2~9), 몫(답)은 1~max → 항상 나누어떨어짐
         b = randInt(rng, 2, 9);
         answer = randInt(rng, 1, p.max);
         a = b * answer;
