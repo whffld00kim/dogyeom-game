@@ -19,9 +19,6 @@ export default class BootScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    loadState().then(() => {
-      this.scene.launch('Debug'); // 진단 오버레이(항상 위에)
-      this.scene.start('Title');
-    });
+    loadState().then(() => this.scene.start('Title'));
   }
 }

@@ -45,15 +45,22 @@ export function makeButton(
     .setOrigin(0.5);
   c.add([g, t]);
   c.setSize(w, h);
-  c.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
-  // 터치 신뢰성: pointerup 은 손가락이 살짝만 움직여도 버튼 밖에서 발생해 클릭이 누락됨
-  // → 누르는 즉시(pointerdown) 실행해 한 번에 반응. (큰 버튼 UI라 오발 위험 적음)
-  c.on('pointerdown', () => {
-    c.setScale(0.94);
-    onClick();
+  // 좌표 기반(씬 레벨) 입력 — 기기 터치에서 오브젝트 단위 히트테스트가 불안정해 직접 판정.
+  // (좌표 매핑은 정확함이 확인됨) destroy 시 리스너 정리해 누수 방지.
+  const hit = (p: Phaser.Input.Pointer) => Math.abs(p.x - x) <= w / 2 && Math.abs(p.y - y) <= h / 2;
+  const onDown = (p: Phaser.Input.Pointer) => {
+    if (hit(p)) {
+      c.setScale(0.94);
+      onClick();
+    }
+  };
+  const onUp = () => c.setScale(1);
+  scene.input.on('pointerdown', onDown);
+  scene.input.on('pointerup', onUp);
+  c.once('destroy', () => {
+    scene.input.off('pointerdown', onDown);
+    scene.input.off('pointerup', onUp);
   });
-  c.on('pointerup', () => c.setScale(1));
-  c.on('pointerout', () => c.setScale(1));
   c.setLabel = (s: string) => t.setText(s);
   c.setBg = (f: number) => draw(f);
   return c;

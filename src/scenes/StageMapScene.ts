@@ -58,13 +58,21 @@ export default class StageMapScene extends Phaser.Scene {
 
     if (unlocked) {
       c.setSize(92, 92);
-      c.setInteractive(new Phaser.Geom.Circle(0, 0, 46), Phaser.Geom.Circle.Contains);
-      c.on('pointerdown', () => {
-        c.setScale(0.94);
-        this.scene.start('Game', { index: n });
+      // 좌표 기반(씬 레벨) 입력
+      const hit = (p: Phaser.Input.Pointer) => Phaser.Math.Distance.Between(p.x, p.y, x, y) <= 46;
+      const onDown = (p: Phaser.Input.Pointer) => {
+        if (hit(p)) {
+          c.setScale(0.94);
+          this.scene.start('Game', { index: n });
+        }
+      };
+      const onUp = () => c.setScale(1);
+      this.input.on('pointerdown', onDown);
+      this.input.on('pointerup', onUp);
+      c.once('destroy', () => {
+        this.input.off('pointerdown', onDown);
+        this.input.off('pointerup', onUp);
       });
-      c.on('pointerup', () => c.setScale(1));
-      c.on('pointerout', () => c.setScale(1));
     }
   }
 }

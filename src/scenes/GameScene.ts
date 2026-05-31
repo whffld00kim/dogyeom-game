@@ -151,13 +151,23 @@ export default class GameScene extends Phaser.Scene {
         .setOrigin(0.5);
       tile.add([g, t]);
       tile.setSize(170, 84);
-      tile.setInteractive(new Phaser.Geom.Rectangle(-85, -42, 170, 84), Phaser.Geom.Rectangle.Contains);
-      tile.on('pointerdown', () => {
-        tile.setScale(0.95);
-        this.onAnswer(val, tile, paint);
+      // 좌표 기반(씬 레벨) 입력
+      const cx = centers[i];
+      const cy = ys;
+      const hit = (p: Phaser.Input.Pointer) => Math.abs(p.x - cx) <= 85 && Math.abs(p.y - cy) <= 42;
+      const onDown = (p: Phaser.Input.Pointer) => {
+        if (this.accepting && hit(p)) {
+          tile.setScale(0.95);
+          this.onAnswer(val, tile, paint);
+        }
+      };
+      const onUp = () => tile.setScale(1);
+      this.input.on('pointerdown', onDown);
+      this.input.on('pointerup', onUp);
+      tile.once('destroy', () => {
+        this.input.off('pointerdown', onDown);
+        this.input.off('pointerup', onUp);
       });
-      tile.on('pointerup', () => tile.setScale(1));
-      tile.on('pointerout', () => tile.setScale(1));
       this.answerLayer.add(tile);
     });
   }
