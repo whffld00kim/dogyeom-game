@@ -1,3 +1,4 @@
+import Phaser from 'phaser';
 import POKEMON_DATA from '../data/pokemon.json';
 import { gameState, persist } from './save';
 
@@ -28,6 +29,41 @@ const PALETTE = [
 ];
 export function placeholderColor(id: number): number {
   return PALETTE[id % PALETTE.length];
+}
+
+// ── 실제 포켓몬 스프라이트 (있으면 사용, 없으면 도형으로 대체) ──
+export function pokeKey(id: number): string {
+  return `poke_${id}`;
+}
+
+/** 필요한 포켓몬 스프라이트를 로드한 뒤 done() 호출. 파일이 없으면(공개 Pages 등) 자동으로 건너뛰고 placeholder 사용. */
+export function loadPokeSprites(scene: Phaser.Scene, ids: number[], done: () => void): void {
+  const need = ids.filter((id) => id >= 1 && !scene.textures.exists(pokeKey(id)));
+  if (need.length === 0) {
+    done();
+    return;
+  }
+  need.forEach((id) => scene.load.image(pokeKey(id), `sprites/${id}.png`));
+  scene.load.once('complete', done);
+  scene.load.start();
+}
+
+/** 포켓몬 아이콘 생성: 스프라이트가 있으면 이미지, 없으면 색 원(placeholder). */
+export function addPokeIcon(scene: Phaser.Scene, x: number, y: number, id: number, size: number): Phaser.GameObjects.GameObject {
+  if (scene.textures.exists(pokeKey(id))) {
+    const img = scene.add.image(x, y, pokeKey(id));
+    img.setScale(size / Math.max(img.width, img.height));
+    return img;
+  }
+  const c = scene.add.container(x, y);
+  const circ = scene.add.circle(0, 0, size * 0.46, placeholderColor(id));
+  circ.setStrokeStyle(4, 0xffffff);
+  c.add([
+    circ,
+    scene.add.circle(-size * 0.16, -size * 0.08, size * 0.085, 0xffffff),
+    scene.add.circle(size * 0.16, -size * 0.08, size * 0.085, 0xffffff),
+  ]);
+  return c;
 }
 
 // 세대 = 지역. 현재 지역 안에서 랜덤으로 포획하고, 다 모으면 다음 지역으로.

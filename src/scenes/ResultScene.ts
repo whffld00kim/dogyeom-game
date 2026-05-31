@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, drawStars } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
-import { getName, placeholderColor } from '../systems/dex';
+import { getName, loadPokeSprites, addPokeIcon } from '../systems/dex';
 import { playCatch } from '../systems/music';
 
 export default class ResultScene extends Phaser.Scene {
@@ -50,13 +50,9 @@ export default class ResultScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     if (hasCatch) {
-      const cy = top + 292;
-      const circ = this.add.circle(px - 78, cy, 36, placeholderColor(caught!));
-      circ.setStrokeStyle(4, 0xffffff);
-      circ.setScale(0);
-      this.tweens.add({ targets: circ, scale: 1, duration: 420, delay: 280, ease: 'Back.easeOut' });
+      const cy = top + 296;
       this.add
-        .text(px - 24, cy, `${getName(caught!)}\n잡았다! 🎉`, {
+        .text(px + 6, cy, `${getName(caught!)}\n잡았다! 🎉`, {
           fontFamily: FONT,
           fontSize: '30px',
           color: '#2b3a67',
@@ -66,6 +62,12 @@ export default class ResultScene extends Phaser.Scene {
           resolution: TEXT_RES,
         })
         .setOrigin(0, 0.5);
+      loadPokeSprites(this, [caught!], () => {
+        const icon = addPokeIcon(this, px - 96, cy, caught!, 96) as Phaser.GameObjects.Image;
+        const ns = icon.scaleX || 1;
+        icon.setScale(0);
+        this.tweens.add({ targets: icon, scaleX: ns, scaleY: ns, duration: 440, ease: 'Back.easeOut' });
+      });
     } else if (missedCatch) {
       const cy = top + 290;
       this.add

@@ -3,7 +3,7 @@ import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState } from '../systems/save';
-import { getName, placeholderColor, TOTAL, currentRegion } from '../systems/dex';
+import { getName, TOTAL, currentRegion, loadPokeSprites, addPokeIcon } from '../systems/dex';
 
 export default class DexScene extends Phaser.Scene {
   constructor() {
@@ -24,7 +24,6 @@ export default class DexScene extends Phaser.Scene {
       .text(DESIGN.width / 2, 108, `${currentRegion().name} 지역 · ${caught.length} / ${TOTAL} 마리`, { fontFamily: FONT, fontSize: '26px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
       .setOrigin(0.5);
 
-    const topY = 150;
     if (caught.length === 0) {
       this.add
         .text(DESIGN.width / 2, 380, '아직 잡은 포켓몬이 없어요!\n스테이지를 클리어하면 포켓몬을 잡을 수 있어요 🎮', {
@@ -39,24 +38,26 @@ export default class DexScene extends Phaser.Scene {
       return;
     }
 
-    // 스크롤 가능한 그리드
+    // 스프라이트 로드 후 그리드 렌더
+    loadPokeSprites(this, caught, () => this.buildGrid(caught));
+  }
+
+  private buildGrid(caught: number[]) {
+    const topY = 150;
     const cols = 6;
     const cellW = 196;
-    const cellH = 150;
+    const cellH = 152;
     const startX = DESIGN.width / 2 - ((cols - 1) * cellW) / 2;
     const grid = this.add.container(0, topY);
     caught.forEach((id, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const x = startX + col * cellW;
-      const y = row * cellH + 44;
-      const circ = this.add.circle(x, y, 38, placeholderColor(id));
-      circ.setStrokeStyle(4, 0xffffff);
-      const eyeL = this.add.circle(x - 12, y - 6, 7, 0xffffff);
-      const eyeR = this.add.circle(x + 12, y - 6, 7, 0xffffff);
-      const nm = this.add.text(x, y + 54, getName(id), { fontFamily: FONT, fontSize: '21px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES }).setOrigin(0.5);
-      const num = this.add.text(x, y + 78, `#${id}`, { fontFamily: FONT, fontSize: '15px', color: '#6c7a99', resolution: TEXT_RES }).setOrigin(0.5);
-      grid.add([circ, eyeL, eyeR, nm, num]);
+      const y = row * cellH + 52;
+      const icon = addPokeIcon(this, x, y, id, 86);
+      const nm = this.add.text(x, y + 60, getName(id), { fontFamily: FONT, fontSize: '21px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES }).setOrigin(0.5);
+      const num = this.add.text(x, y + 84, `#${id}`, { fontFamily: FONT, fontSize: '15px', color: '#6c7a99', resolution: TEXT_RES }).setOrigin(0.5);
+      grid.add([icon, nm, num]);
     });
 
     const rows = Math.ceil(caught.length / cols);
@@ -65,13 +66,11 @@ export default class DexScene extends Phaser.Scene {
     const maxY = topY;
     const minY = topY - Math.max(0, contentH - viewH);
 
-    // 뷰포트 밖 클리핑
     const mask = this.make.graphics({});
     mask.fillStyle(0xffffff);
     mask.fillRect(0, topY, DESIGN.width, viewH);
     grid.setMask(mask.createGeometryMask());
 
-    // 드래그 스크롤 (그리드 영역에서만)
     let dragging = false;
     let startPY = 0;
     let startGY = topY;
