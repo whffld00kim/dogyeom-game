@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { DESIGN, FONT } from '../theme';
-import { loadState } from '../systems/save';
+import { loadState, gameState } from '../systems/save';
 import { reconcileCaught } from '../systems/dex';
+import { setLevel } from '../systems/music';
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
@@ -22,6 +23,7 @@ export default class BootScene extends Phaser.Scene {
 
     loadState().then((oldSave) => {
       if (oldSave) reconcileCaught(); // 구버전 저장만 1회 보정
+      setLevel(gameState.soundLevel); // 저장된 소리 레벨 적용
       this.scene.start('Title');
     });
   }

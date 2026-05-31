@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DESIGN } from './theme';
+import { startMusic } from './systems/music';
 import BootScene from './scenes/BootScene';
 import TitleScene from './scenes/TitleScene';
 import SettingsScene from './scenes/SettingsScene';
@@ -32,3 +33,6 @@ const config: Phaser.Types.Core.GameConfig = {
 const game = new Phaser.Game(config);
 // 개발 편의: 콘솔/검증에서 접근 가능하도록 노출 (프로덕션 무해)
 (window as any).game = game;
+
+// 첫 사용자 입력 후 배경음악 시작 (브라우저 자동재생 정책상 제스처 필요)
+window.addEventListener('pointerdown', () => startMusic(), { once: true });

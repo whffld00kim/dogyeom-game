@@ -5,6 +5,7 @@ import { drawBackground, makeButton, ButtonContainer } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState, saveSettings } from '../systems/save';
 import { OP_LABEL, presetLabel, presetCount } from '../systems/settings';
+import { setLevel, startMusic } from '../systems/music';
 import type { Op } from '../types';
 
 export default class SettingsScene extends Phaser.Scene {
@@ -67,6 +68,8 @@ export default class SettingsScene extends Phaser.Scene {
       { k: 'hard', l: '빠름' },
     ], () => s.timeLevel, (k) => (s.timeLevel = k as any));
 
+    this.makeSoundControl();
+
     // 하단 안내 + 버튼
     this.add
       .text(940, 470, '곱셈·나눗셈은 탐험 모드로\n시간 압박 없이 연습해요!', {
@@ -102,6 +105,33 @@ export default class SettingsScene extends Phaser.Scene {
         set(it.k);
         refresh();
         saveSettings();
+      }, { fontSize: 26 });
+      btns.push(b);
+    });
+    refresh();
+  }
+
+  private makeSoundControl() {
+    this.add
+      .text(1065, 150, '🔊 소리', { fontFamily: FONT, fontSize: '30px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
+      .setOrigin(0.5);
+    const opts = [
+      { l: 0, t: '끔' },
+      { l: 1, t: '작게' },
+      { l: 2, t: '보통' },
+      { l: 3, t: '크게' },
+    ];
+    const btns: ButtonContainer[] = [];
+    const refresh = () => btns.forEach((b, i) => b.setBg(gameState.soundLevel === opts[i].l ? COLORS.btnGreen : COLORS.btnGray));
+    opts.forEach((o, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const b = makeButton(this, 990 + col * 155, 212 + row * 72, 140, 58, o.t, () => {
+        gameState.soundLevel = o.l;
+        setLevel(o.l);
+        startMusic();
+        saveSettings();
+        refresh();
       }, { fontSize: 26 });
       btns.push(b);
     });

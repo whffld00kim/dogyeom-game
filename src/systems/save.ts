@@ -17,6 +17,7 @@ export interface GameState {
   seenStory: string[]; // 이미 본 지역 스토리(지역명)
   ownedItems: string[]; // 구매한 꾸미기 아이템 id
   equipped: Record<string, string>; // 슬롯(hat/glasses/held) → 아이템 id
+  soundLevel: number; // 0 끔 / 1 작게 / 2 보통 / 3 크게
 }
 
 export function createDefault(): GameState {
@@ -31,6 +32,7 @@ export function createDefault(): GameState {
     seenStory: [],
     ownedItems: [],
     equipped: {},
+    soundLevel: 2,
   };
 }
 
@@ -65,6 +67,7 @@ export async function loadState(): Promise<boolean> {
       if (!Array.isArray(merged.seenStory)) merged.seenStory = [];
       if (!Array.isArray(merged.ownedItems)) merged.ownedItems = [];
       if (!merged.equipped || typeof merged.equipped !== 'object') merged.equipped = {};
+      if (typeof merged.soundLevel !== 'number') merged.soundLevel = 2;
       merged.schemaVersion = SCHEMA_VERSION;
       Object.assign(gameState, merged);
     }
