@@ -6,5 +6,21 @@ dev-dist/
 Thumbs.db
 .vite/
 
-# 저작권물(실제 포켓몬/지우 스프라이트)은 공개 저장소에 올리지 않음. 로컬/APK 에만 존재.
+# 저작권물(실제 포켓몬/지우 스프라이트, 전용 코디)은 공개 저장소에 올리지 않음. 로컬/APK 에만 존재.
 public/sprites/
+public/items/
+sheets/
+public/ash.png
+public/bg/
+bg_src/
+manual_src/
+refix_backup/
+bg_candidates/
+_*.png
+_*.txt
+
+# 비밀 자격증명(서비스계정 JSON 키 등) — 절대 커밋 금지!
+vertex-key.json
+*service-account*.json
+*-sa-key.json
+*.serviceaccount.json
