@@ -14,6 +14,7 @@ export function defaultSettings(): Settings {
     maxMiss: 2, // 10문제 중 2번까지 틀려도 포획 (문제 수 10 고정에 맞춘 기본값)
     subject: 'math', // 과목: 수학(기본) / 한글 / 섞기
     hangulLevel: 1, // 한글 단계: 글자 고르기(기본)
+    mixEasier: true, // 새 단계로 올리면 그 단계만 나오는 게 너무 어려워서 기본은 섞기
   };
 }
 
@@ -44,14 +45,18 @@ export const ADD_SUB_PRESETS: AddSubPreset[] = [
   { label: '1 ~ 1000', max: 1000 },
 ];
 
-// 곱셈·나눗셈 프리셋 (단 모드: 해당 단 × 1~9 / 범위 모드: 1~max)
+// 곱셈·나눗셈 프리셋 (단 모드: 해당 단 × 1~9 / 두 자리 쉬움: 받아올림 없는 두 자리×한 자리 / 범위 모드: 1~max)
+// ⚠ 순서를 바꾸거나 중간에 끼우면 저장된 presetIndex 가 밀린다 → save.ts 의 SCHEMA_VERSION 마이그레이션도 함께
 export type MulDivPreset =
   | { label: string; kind: 'dan'; danMin: number; danMax: number }
+  | { label: string; kind: 'twoDigitNoCarry' }
   | { label: string; kind: 'range'; max: number };
 export const MUL_DIV_PRESETS: MulDivPreset[] = [
   { label: '2~5단', kind: 'dan', danMin: 2, danMax: 5 },
   { label: '4~9단', kind: 'dan', danMin: 4, danMax: 9 },
   { label: '1~9단', kind: 'dan', danMin: 1, danMax: 9 },
+  // 1~9단과 1~100(두 자리×한 자리, 초3) 사이의 한 계단: 12×3, 21×4, 84÷4 처럼 받아올림이 없는 것만 (2026-09-10)
+  { label: '두 자리 쉬움', kind: 'twoDigitNoCarry' },
   { label: '1~100', kind: 'range', max: 100 },
   { label: '1~1000', kind: 'range', max: 1000 },
 ];
@@ -64,6 +69,13 @@ export function clampPresetIndex(op: Op, idx: number): number {
   const n = presetCount(op);
   const i = Number.isInteger(idx) ? idx : 0;
   return ((i % n) + n) % n;
+}
+
+/** 이번 문제에 실제로 쓸 프리셋 인덱스. 쉬운 문제 섞기가 켜져 있으면 절반은 더 낮은 단계에서 고른다 */
+export function pickPresetIndex(s: Settings, op: Op, rng: () => number = Math.random): number {
+  const idx = clampPresetIndex(op, s.ops[op]?.presetIndex ?? 0);
+  if (!s.mixEasier || idx === 0 || rng() >= 0.5) return idx;
+  return Math.floor(rng() * idx); // 0 ~ idx-1
 }
 
 export function presetLabel(op: Op, idx: number): string {

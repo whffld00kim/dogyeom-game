@@ -3,7 +3,7 @@ import type { Settings } from '../types';
 import { defaultSettings } from './settings';
 import POKEMON_DATA from '../data/pokemon.json';
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6; // v6: 곱셈·나눗셈 프리셋 '두 자리 쉬움'을 3번에 끼움 → 그 뒤 인덱스 +1
 const KEY = 'dogyeom-save';
 const BACKUP_KEY = 'dogyeom-save-backup';
 const ADMIN_BACKUP_KEY = 'dogyeom-admin-backup'; // 관리자모드 진입 시 실제 상태 백업
@@ -83,7 +83,14 @@ function buildMerged(saved: any): GameState {
       presetIndex: Number.isInteger(so.presetIndex) ? (so.presetIndex as number) : 0,
     };
   });
+  // v6: MUL_DIV_PRESETS 3번 자리에 '두 자리 쉬움'이 들어가 1~100(3)·1~1000(4)이 한 칸 밀렸다 → 저장값 보정
+  if ((saved.schemaVersion || 0) < 6) {
+    (['mul', 'div'] as const).forEach((op) => {
+      if (ops[op].presetIndex >= 3) ops[op].presetIndex += 1;
+    });
+  }
   merged.settings.ops = ops;
+  merged.settings.mixEasier = typeof merged.settings.mixEasier === 'boolean' ? merged.settings.mixEasier : true;
   // 실수 허용 횟수: 구세이브/외부 코드에서 이상값이면 기본 2로, 1~9 범위로 보정
   merged.settings.maxMiss = Math.max(1, Math.min(9, Math.round(Number(merged.settings.maxMiss) || 2)));
   // 과목/한글 단계: 구세이브·외부 코드 이상값 보정

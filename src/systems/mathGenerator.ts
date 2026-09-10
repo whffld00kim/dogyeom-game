@@ -1,5 +1,5 @@
 import type { Settings, Op, Problem } from '../types';
-import { OP_SYMBOL, ADD_SUB_PRESETS, MUL_DIV_PRESETS, clampPresetIndex } from './settings';
+import { OP_SYMBOL, ADD_SUB_PRESETS, MUL_DIV_PRESETS, pickPresetIndex } from './settings';
 
 function randInt(rng: () => number, min: number, max: number): number {
   if (max < min) [min, max] = [max, min];
@@ -26,7 +26,7 @@ export function enabledOps(s: Settings): Op[] {
 export function makeProblem(s: Settings, rng: () => number = Math.random): Problem {
   const ops = enabledOps(s);
   const op: Op = ops.length ? ops[Math.floor(rng() * ops.length)] : 'add';
-  const idx = clampPresetIndex(op, s.ops[op]?.presetIndex ?? 0);
+  const idx = pickPresetIndex(s, op, rng); // 쉬운 문제 섞기가 켜져 있으면 낮은 단계가 반씩 섞인다
 
   let a: number, b: number, answer: number;
   if (op === 'add') {
@@ -57,6 +57,24 @@ export function makeProblem(s: Settings, rng: () => number = Math.random): Probl
         // 나눗셈: 나누는 수 = 단, 몫 = 1~9 → a ÷ b 가 나누어떨어짐
         b = dan;
         answer = other;
+        a = b * answer;
+      }
+    } else if (p.kind === 'twoDigitNoCarry') {
+      // 두 자리 쉬움: (10t+o) × d 인데 t×d, o×d 가 모두 한 자리 → 받아올림 없음. 예: 12×3, 21×4, 30×3
+      // d 를 먼저 고르고 t, o 를 9/d 이하로 제한한다. o=0 도 허용 (10×3, 20×4 같은 것)
+      const d = randInt(rng, 2, 9);
+      const lim = Math.floor(9 / d);
+      const t = randInt(rng, 1, lim);
+      const o = randInt(rng, 0, lim);
+      const two = 10 * t + o;
+      if (op === 'mul') {
+        a = two;
+        b = d;
+        answer = a * b;
+      } else {
+        // 나눗셈은 같은 식을 뒤집는다: 84 ÷ 4 = 21
+        b = d;
+        answer = two;
         a = b * answer;
       }
     } else {

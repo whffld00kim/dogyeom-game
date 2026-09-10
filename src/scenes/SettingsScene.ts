@@ -131,6 +131,22 @@ export default class SettingsScene extends Phaser.Scene {
       refresh();
     });
 
+    // 쉬운 문제 섞기 — 연산 행 오른쪽. 켜면 고른 단계보다 낮은 단계 문제가 반씩 섞인다 (2026-09-10)
+    this.text(1000, 218, '쉬운 문제 섞기', 26, 0.5);
+    let mixBtn: ButtonContainer;
+    const mixRefresh = () => {
+      mixBtn.setLabel(s.mixEasier ? '켜짐' : '꺼짐');
+      mixBtn.setBg(s.mixEasier ? COLORS.btnGreen : COLORS.btnGray);
+    };
+    mixBtn = this.btn(1000, 282, 160, 54, '', () => {
+      s.mixEasier = !s.mixEasier;
+      mixRefresh();
+      saveSettings();
+    }, { ...GLOSS3D, fontSize: 24 });
+    mixRefresh();
+    this.text(1000, 346, '켜짐: 낮은 단계도 반씩', 18, 0.5);
+    this.text(1000, 372, '꺼짐: 고른 단계만', 18, 0.5);
+
     this.group(160, 486, '한글 단계', [
       { k: '1', l: '글자 고르기' },
       { k: '2', l: '맞는 글자' },
