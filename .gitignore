@@ -24,3 +24,9 @@ vertex-key.json
 *service-account*.json
 *-sa-key.json
 *.serviceaccount.json
+
+# 작업 부산물
+__pycache__/
+*.log
+android/build_log.txt
+builds/

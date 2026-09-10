@@ -1,22 +1,24 @@
 import Phaser from 'phaser';
 import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
-import { drawBackground, makeButton, addCoinHud, drawStars } from '../widgets';
+import { drawBackground, makeButton, addCoinHud, drawStars, applyHiRes } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { getName, loadPokeSprites, addPokeIcon } from '../systems/dex';
 import { playCatch } from '../systems/music';
+import { gameState, todayKey } from '../systems/save';
 
 export default class ResultScene extends Phaser.Scene {
-  private rdata!: { index: number; stars: number; reward: number; caught: number | null; missedCatch?: boolean };
+  private rdata!: { index: number; stars: number; reward: number; caught: number | null; missedCatch?: boolean; counted?: boolean };
 
   constructor() {
     super('Result');
   }
 
-  init(data: { index: number; stars: number; reward: number; caught: number | null; missedCatch?: boolean }) {
+  init(data: { index: number; stars: number; reward: number; caught: number | null; missedCatch?: boolean; counted?: boolean }) {
     this.rdata = data;
   }
 
   create() {
+    applyHiRes(this);
     const { index, stars, reward, caught, missedCatch } = this.rdata;
     drawBackground(this, BIOME_COLORS['초원']);
     addCoinHud(this);
@@ -45,9 +47,11 @@ export default class ResultScene extends Phaser.Scene {
     starG.setScale(0);
     this.tweens.add({ targets: starG, scale: 1, duration: 450, ease: 'Back.easeOut' });
 
-    this.add
-      .text(px, top + 188, `+${reward}  🪙`, { fontFamily: FONT, fontSize: '42px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
-      .setOrigin(0.5);
+    if (reward > 0) {
+      this.add
+        .text(px, top + 188, `+${reward}  🪙`, { fontFamily: FONT, fontSize: '42px', color: '#2b3a67', fontStyle: 'bold', resolution: TEXT_RES })
+        .setOrigin(0.5);
+    }
 
     if (hasCatch) {
       const cy = top + 296;
@@ -68,10 +72,21 @@ export default class ResultScene extends Phaser.Scene {
         icon.setScale(0);
         this.tweens.add({ targets: icon, scaleX: ns, scaleY: ns, duration: 440, ease: 'Back.easeOut' });
       });
+      // 오늘 잡은 수 + 로블록스 보상(1마리 = 1분)
+      const tn = gameState.dailyCatch[todayKey()] || 0;
+      this.add
+        .text(px, cy + 70, `오늘 ${tn}마리째! · 🎮 로블록스 ${tn}분`, {
+          fontFamily: FONT,
+          fontSize: '24px',
+          color: '#2e9e4f',
+          fontStyle: 'bold',
+          resolution: TEXT_RES,
+        })
+        .setOrigin(0.5);
     } else if (missedCatch) {
       const cy = top + 290;
       this.add
-        .text(px, cy, '아쉽다! 실수가 많아서 포켓몬을 놓쳤어요 😢\n다시 도전하면 잡을 수 있어요!', {
+        .text(px, cy, '아쉽다! 실수가 많아서\n포켓몬도 코인도 놓쳤어요 😢\n다시 도전하면 잡을 수 있어요!', {
           fontFamily: FONT,
           fontSize: '26px',
           color: '#e0556b',
@@ -81,11 +96,28 @@ export default class ResultScene extends Phaser.Scene {
           resolution: TEXT_RES,
         })
         .setOrigin(0.5);
+    } else if (this.rdata.counted) {
+      // 이미 잡은 포켓몬 재도전 성공 — 오늘 기록(1마리=1분)에는 포함
+      const tn = gameState.dailyCatch[todayKey()] || 0;
+      this.add
+        .text(px, top + 262, `오늘 ${tn}마리째! · 🎮 로블록스 ${tn}분`, {
+          fontFamily: FONT,
+          fontSize: '26px',
+          color: '#2e9e4f',
+          fontStyle: 'bold',
+          resolution: TEXT_RES,
+        })
+        .setOrigin(0.5);
     }
 
     const by = py + ph / 2 - 56;
     makeButton(this, px - 185, by, 160, 72, '↻ 다시', () => this.scene.start('Game', { index }), { bg: COLORS.btnGray, fontSize: 30 });
     makeButton(this, px, by, 160, 72, '🗺 맵', () => this.scene.start('StageMap'), { fontSize: 30 });
     makeButton(this, px + 185, by, 160, 72, '다음 ▶', () => this.scene.start('Game', { index: index + 1 }), { bg: COLORS.btnGreen, fontSize: 30 });
+  }
+
+  /** 하드웨어 백버튼 → 스테이지 선택으로 */
+  goBack() {
+    this.scene.start('StageMap');
   }
 }

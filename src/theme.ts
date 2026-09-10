@@ -1,8 +1,25 @@
-// 디자인 해상도(가로 16:9) — 모든 좌표는 이 기준, Scale.FIT 로 화면에 맞춤
-export const DESIGN = { width: 1280, height: 720 };
+// 디자인 해상도 — 기본 1280×720(16:9). 기기 화면비에 맞춰 부팅 시 한쪽을 확장해
+// FIT 레터박스(상하/좌우 검은 여백)를 제거: 와이드(폰/폴드 커버 21:9)는 가로를,
+// 사각(폴드 메인)·16:10(탭)은 세로를 늘림. 16:9 기기에서는 정확히 1280×720(기존과 동일).
+// 모든 씬 좌표는 DESIGN 기준(가운데 정렬·가장자리 앵커) — import 시점에 이미 확정됨.
+const BASE_W = 1280;
+const BASE_H = 720;
+function deviceAspect(): number {
+  if (typeof window === 'undefined') return BASE_W / BASE_H;
+  const w = window.innerWidth || BASE_W;
+  const h = window.innerHeight || BASE_H;
+  // 가로 게임: 부팅이 세로로 잡혀도 긴변/짧은변으로 판정
+  const a = Math.max(w, h) / Math.max(1, Math.min(w, h));
+  return Math.min(2.6, Math.max(1.0, a));
+}
+const ASPECT = deviceAspect();
+export const DESIGN =
+  ASPECT >= BASE_W / BASE_H
+    ? { width: Math.min(1880, Math.round((BASE_H * ASPECT) / 2) * 2), height: BASE_H }
+    : { width: BASE_W, height: Math.min(1300, Math.round((BASE_W / ASPECT) / 2) * 2) };
 
-// 한글 지원 폰트 스택 (실기기엔 서브셋 woff2 추가 예정)
-export const FONT = 'Pretendard, "Noto Sans KR", "Malgun Gothic", sans-serif';
+// 한글 지원 폰트 스택 — Jua(화려한 둥근 고딕, public/fonts/Jua-Regular.ttf, index.html @font-face) 우선, 없으면 시스템 한글폰트
+export const FONT = 'Jua, "Noto Sans KR", "Malgun Gothic", sans-serif';
 
 export const COLORS = {
   skyTop: 0xbfeaff,
@@ -35,3 +52,12 @@ export const GROUND_Y = Math.round(DESIGN.height * 0.74); // 지면 기준선 y
 
 // HiDPI 태블릿에서 캔버스 텍스트가 흐릿해 보이는 것 방지 (텍스트를 기기 배율로 렌더)
 export const TEXT_RES = Math.max(2, Math.min(3, (typeof window !== 'undefined' && window.devicePixelRatio) || 2));
+
+// 고해상도 렌더 배율: Scale.FIT 는 zoom 을 백버퍼에 반영하지 않으므로,
+// gameSize 를 DESIGN×HD 로 키워 캔버스 백버퍼를 실제 화면 픽셀에 맞춘다.
+// 각 씬은 create() 에서 applyHiRes(this) 로 카메라를 HD배 줌 → 좌표계는 1280×720 유지.
+export const HD = (() => {
+  const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+  const sw = typeof window !== 'undefined' && window.screen ? Math.max(window.screen.width, window.screen.height) : DESIGN.width;
+  return Math.max(2, Math.min(3, Math.ceil((sw * dpr) / DESIGN.width)));
+})();

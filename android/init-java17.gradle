@@ -1,0 +1,14 @@
+// 임시: Capacitor 모듈의 Java 21 소스호환을 17로 낮춰 JDK 17로 빌드 가능하게.
+allprojects {
+  afterEvaluate { proj ->
+    def ext = proj.extensions.findByName('android')
+    if (ext != null) {
+      ext.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
+      ext.compileOptions.targetCompatibility = JavaVersion.VERSION_17
+    }
+    proj.tasks.withType(JavaCompile).configureEach {
+      sourceCompatibility = '17'
+      targetCompatibility = '17'
+    }
+  }
+}

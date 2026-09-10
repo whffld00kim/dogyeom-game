@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { DESIGN } from './theme';
+import { App } from '@capacitor/app';
+import { DESIGN, HD } from './theme';
 import { startMusic } from './systems/music';
 import BootScene from './scenes/BootScene';
 import TitleScene from './scenes/TitleScene';
@@ -10,10 +11,8 @@ import ResultScene from './scenes/ResultScene';
 import DexScene from './scenes/DexScene';
 import ShopScene from './scenes/ShopScene';
 import DialogueScene from './scenes/DialogueScene';
+import DailyScene from './scenes/DailyScene';
 import DebugScene from './scenes/DebugScene';
-
-// HiDPI 선명도: 캔버스를 기기 배율 그대로(최대 3x) 렌더 → 선·테두리까지 또렷. 게임 좌표는 1280x720 유지.
-const HD = Math.min(3, Math.max(1, (typeof window !== 'undefined' && window.devicePixelRatio) || 1));
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -22,17 +21,49 @@ const config: Phaser.Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: DESIGN.width,
-    height: DESIGN.height,
-    zoom: HD,
+    // 백버퍼를 고해상도로: DESIGN(1280x720)×HD. 각 씬은 applyHiRes()로 카메라 HD배 줌 → 좌표는 1280x720 유지.
+    width: DESIGN.width * HD,
+    height: DESIGN.height * HD,
   },
   render: { antialias: true },
-  scene: [BootScene, TitleScene, SettingsScene, StageMapScene, GameScene, ResultScene, DexScene, ShopScene, DialogueScene, DebugScene],
+  scene: [BootScene, TitleScene, SettingsScene, StageMapScene, GameScene, ResultScene, DexScene, ShopScene, DialogueScene, DailyScene, DebugScene],
 };
 
 const game = new Phaser.Game(config);
 // 개발 편의: 콘솔/검증에서 접근 가능하도록 노출 (프로덕션 무해)
 (window as any).game = game;
 
+// 폴더블/일부 WebView: 부팅 직후 뷰포트 크기가 늦게 확정되거나 접힘 전환 시 resize를
+// Phaser 가 놓쳐 캔버스가 작게 굳는 문제 → FIT 재계산을 명시적으로 반복 보정.
+const refit = () => {
+  try {
+    game.scale.refresh();
+  } catch {
+    /* boot 전 호출 무시 */
+  }
+};
+window.addEventListener('resize', () => {
+  refit();
+  setTimeout(refit, 120);
+  setTimeout(refit, 500);
+});
+window.addEventListener('orientationchange', () => setTimeout(refit, 150));
+document.addEventListener('visibilitychange', () => setTimeout(refit, 100));
+[300, 800, 1600, 3000].forEach((t) => setTimeout(refit, t)); // 부팅 직후 보정
+
 // 첫 사용자 입력 후 배경음악 시작 (브라우저 자동재생 정책상 제스처 필요)
 window.addEventListener('pointerdown', () => startMusic(), { once: true });
+
+// 안드로이드 하드웨어 백버튼 → 앱 종료 대신 화면 내 '뒤로'. (Title/Boot 에서만 앱 종료)
+App.addListener('backButton', () => {
+  const active = game.scene.getScenes(true);
+  const top = active[active.length - 1] as Phaser.Scene & { goBack?: () => void };
+  const key = top?.scene?.key;
+  if (!top || key === 'Title' || key === 'Boot') {
+    App.exitApp();
+  } else if (typeof top.goBack === 'function') {
+    top.goBack();
+  } else {
+    App.exitApp();
+  }
+}).catch(() => {});

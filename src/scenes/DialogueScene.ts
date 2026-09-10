@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
-import { drawBackground } from '../widgets';
+import { drawBackground, applyHiRes } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState, persist } from '../systems/save';
 import { addAsh } from '../systems/dex';
@@ -28,15 +28,16 @@ export default class DialogueScene extends Phaser.Scene {
   }
 
   create() {
+    applyHiRes(this);
     drawBackground(this, BIOME_COLORS['숲']);
 
-    // 주인공 지우 (스프라이트 없으면 도형으로 대체)
-    addAsh(this, 170, 340, 175);
+    // 주인공 지우 (스프라이트 없으면 도형으로 대체) — 대사 상자 위(하단 앵커)
+    addAsh(this, 170, DESIGN.height - 380, 175);
 
-    // 대사 상자
+    // 대사 상자 (하단 앵커, =468 at 16:9)
     const bx = 60;
     const bw = DESIGN.width - 120;
-    const by = 468;
+    const by = DESIGN.height - 252;
     const bh = 204;
     const g = this.add.graphics();
     g.fillStyle(0x000000, 0.15);
@@ -98,5 +99,10 @@ export default class DialogueScene extends Phaser.Scene {
       persist();
     }
     this.scene.start(this.nextScene, this.nextData as object);
+  }
+
+  /** 하드웨어 백버튼 → 대사 건너뛰고 진행 */
+  goBack() {
+    this.finish();
   }
 }

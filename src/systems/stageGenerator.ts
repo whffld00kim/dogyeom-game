@@ -22,7 +22,7 @@ export const BIOME_COLORS: Record<string, { top: number; bottom: number; ground:
 export function makeStage(index: number, _s: Settings): Stage {
   const isBoss = index % 10 === 0;
   const isMilestone = !isBoss && index % 5 === 0;
-  const problems = Math.min(10, 4 + Math.floor(index / 5)); // 4 → 10 으로 완만 증가
+  const problems = 10; // 모든 포켓몬 대결 = 10문제 고정
   const biome = BIOMES[Math.floor((index - 1) / 5) % BIOMES.length];
   return { index, biome, problems, isMilestone, isBoss };
 }

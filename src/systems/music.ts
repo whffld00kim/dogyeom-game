@@ -1,38 +1,28 @@
-// Web Audio 로 직접 합성하는 배경음악 (외부 파일/저작권 없음, 완전 오프라인).
-// 밝은 다장조 동요풍 루프 + 부드러운 베이스.
+// 전체 배경음악 + 배틀 음악 = 둘 다 mp3 파일. 효과음(SFX)만 Web Audio 합성. 완전 오프라인.
 
 const GAINS = [0, 0.1, 0.26, 0.5]; // 끔/작게/보통/크게 → 마스터 볼륨
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let level = 2;
-let timerId: number | null = null;
-let step = 0;
-let nextTime = 0;
 
-const TEMPO = 112;
-const STEP = 60 / TEMPO / 2; // 8분음표 길이(초)
+// 배틀 음악(파일) — master 게인에 연결(소리 설정 그대로 적용)
+let bgWanted = false;
+const BATTLE_URL = 'audio/battle.mp3'; // 문서 기준 상대경로(APK '/' · Pages '/repo/' 양쪽 정상 해석)
+let battleBuf: AudioBuffer | null = null;
+let battleSrc: AudioBufferSourceNode | null = null;
+let battleLoading = false;
+
+// 전체 배경음악(파일) — HTMLAudioElement → master(소리 설정 적용), 무한 루프. 배틀 중엔 일시정지.
+const BGM_URL = 'audio/bgm.mp3';
+let bgmEl: HTMLAudioElement | null = null;
+let bgmGain: GainNode | null = null;
 
 const F: Record<string, number> = {
   C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.0, A3: 220.0, B3: 246.94,
   C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, A4: 440.0, B4: 493.88,
   C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880.0, C6: 1046.5,
 };
-
-// 멜로디(8분음표 32스텝 = 4마디 루프)
-const MEL: (string | null)[] = [
-  'G4', 'E4', 'C4', 'E4', 'G4', 'A4', 'G4', 'E4',
-  'F4', 'D4', 'C4', 'D4', 'F4', 'A4', 'G4', null,
-  'E4', 'G4', 'C5', 'B4', 'A4', 'G4', 'A4', 'G4',
-  'F4', 'E4', 'D4', 'E4', 'C4', null, null, null,
-];
-// 베이스 (I I IV V vi IV V I)
-const BASS: (string | null)[] = [
-  'C3', null, null, null, 'C3', null, null, null,
-  'F3', null, null, null, 'G3', null, null, null,
-  'A3', null, null, null, 'F3', null, null, null,
-  'G3', null, null, null, 'C3', null, null, null,
-];
 
 function ensure() {
   if (ctx) return;
@@ -62,27 +52,88 @@ function note(freq: number, t: number, dur: number, type: OscillatorType, vol: n
   o.stop(t + dur + 0.03);
 }
 
-function scheduler() {
-  if (!ctx) return;
-  while (nextTime < ctx.currentTime + 0.12) {
-    const m = MEL[step];
-    if (m) note(F[m], nextTime, STEP * 0.9, 'triangle', 0.6);
-    const b = BASS[step];
-    if (b) note(F[b], nextTime, STEP * 1.9, 'sine', 0.55);
-    nextTime += STEP;
-    step = (step + 1) % MEL.length;
+function ensureBgm() {
+  if (bgmEl || !ctx || !master) return;
+  bgmEl = new Audio(BGM_URL);
+  bgmEl.loop = true;
+  bgmEl.preload = 'auto';
+  try {
+    bgmGain = ctx.createGain();
+    bgmGain.gain.value = 0.7; // 배틀(0.8) 대비 밸런스(마스터 볼륨은 setLevel이 별도 적용)
+    const node = ctx.createMediaElementSource(bgmEl);
+    node.connect(bgmGain);
+    bgmGain.connect(master);
+  } catch (e) {
+    console.warn('[music] BGM 연결 실패:', e);
   }
 }
 
 /** 첫 사용자 입력(제스처) 후 호출되어야 소리가 남 (브라우저 정책). 반복 호출 안전. */
 export function startMusic() {
+  bgWanted = true;
   ensure();
   if (!ctx) return;
   if (ctx.state === 'suspended') ctx.resume();
-  if (timerId != null) return;
-  nextTime = ctx.currentTime + 0.1;
-  step = 0;
-  timerId = window.setInterval(scheduler, 25);
+  loadBattle(); // 배틀 음악 미리 디코드(첫 배틀 무음 지연 방지)
+  ensureBgm();
+  if (bgmEl && !battleSrc) bgmEl.play().catch(() => {}); // 배틀 중이 아니면 전체 BGM 재생
+}
+
+// ── 합성 BGM 일시정지/재개 (배틀 음악과 겹치지 않게) ──
+function pauseBg() {
+  if (bgmEl) bgmEl.pause();
+}
+function resumeBg() {
+  if (!bgWanted || !bgmEl) return;
+  if (ctx && ctx.state === 'suspended') ctx.resume();
+  bgmEl.play().catch(() => {});
+}
+
+async function loadBattle() {
+  ensure();
+  if (!ctx || battleBuf || battleLoading) return;
+  battleLoading = true;
+  try {
+    const res = await fetch(BATTLE_URL);
+    const arr = await res.arrayBuffer();
+    battleBuf = await ctx.decodeAudioData(arr);
+  } catch (e) {
+    console.warn('[music] 배틀 음악 로드 실패:', e);
+  }
+  battleLoading = false;
+}
+
+/** 배틀 음악(파일) 무한 재생 시작. 합성 BGM은 잠시 멈춤. 반복 호출 안전. */
+export function startBattleMusic() {
+  ensure();
+  if (!ctx || !master) return;
+  if (ctx.state === 'suspended') ctx.resume();
+  pauseBg();
+  if (battleSrc) return; // 이미 재생 중
+  const begin = () => {
+    if (!ctx || !master || !battleBuf || battleSrc) return;
+    const g = ctx.createGain();
+    g.gain.value = 0.8; // 합성음 대비 밸런스(마스터 볼륨은 setLevel이 별도 적용)
+    const src = ctx.createBufferSource();
+    src.buffer = battleBuf;
+    src.loop = true;
+    src.connect(g);
+    g.connect(master);
+    src.start();
+    battleSrc = src;
+  };
+  if (battleBuf) begin();
+  else loadBattle().then(begin);
+}
+
+/** 배틀 음악 정지 + 합성 BGM 복원. */
+export function stopBattleMusic() {
+  if (battleSrc) {
+    try { battleSrc.stop(); } catch { /* noop */ }
+    try { battleSrc.disconnect(); } catch { /* noop */ }
+    battleSrc = null;
+  }
+  resumeBg();
 }
 
 export function setLevel(l: number) {

@@ -11,6 +11,9 @@ export function defaultSettings(): Settings {
     answerMode: 'choice',
     mode: 'explore', // 기본: 시간 압박 없는 탐험 모드
     timeLevel: 'normal',
+    maxMiss: 2, // 10문제 중 2번까지 틀려도 포획 (문제 수 10 고정에 맞춘 기본값)
+    subject: 'math', // 과목: 수학(기본) / 한글 / 섞기
+    hangulLevel: 1, // 한글 단계: 글자 고르기(기본)
   };
 }
 
@@ -46,9 +49,8 @@ export type MulDivPreset =
   | { label: string; kind: 'dan'; danMin: number; danMax: number }
   | { label: string; kind: 'range'; max: number };
 export const MUL_DIV_PRESETS: MulDivPreset[] = [
-  { label: '1~3단', kind: 'dan', danMin: 1, danMax: 3 },
-  { label: '4~6단', kind: 'dan', danMin: 4, danMax: 6 },
-  { label: '7~9단', kind: 'dan', danMin: 7, danMax: 9 },
+  { label: '2~5단', kind: 'dan', danMin: 2, danMax: 5 },
+  { label: '4~9단', kind: 'dan', danMin: 4, danMax: 9 },
   { label: '1~9단', kind: 'dan', danMin: 1, danMax: 9 },
   { label: '1~100', kind: 'range', max: 100 },
   { label: '1~1000', kind: 'range', max: 1000 },

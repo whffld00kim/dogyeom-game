@@ -49,13 +49,9 @@ export function makeProblem(s: Settings, rng: () => number = Math.random): Probl
       const dan = randInt(rng, p.danMin, p.danMax);
       const other = randInt(rng, 1, 9);
       if (op === 'mul') {
-        if (rng() < 0.5) {
-          a = dan;
-          b = other;
-        } else {
-          a = other;
-          b = dan;
-        }
+        // 단을 앞에 표기 (예: 2단 = 2×1 ~ 2×9)
+        a = dan;
+        b = other;
         answer = a * b;
       } else {
         // 나눗셈: 나누는 수 = 단, 몫 = 1~9 → a ÷ b 가 나누어떨어짐
