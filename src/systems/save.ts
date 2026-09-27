@@ -3,7 +3,7 @@ import type { Settings } from '../types';
 import { defaultSettings } from './settings';
 import POKEMON_DATA from '../data/pokemon.json';
 
-const SCHEMA_VERSION = 6; // v6: 곱셈·나눗셈 프리셋 '두 자리 쉬움'을 3번에 끼움 → 그 뒤 인덱스 +1
+const SCHEMA_VERSION = 7; // v6: 곱셈·나눗셈 프리셋 '두 자리 쉬움'을 3번에 끼움 → 그 뒤 인덱스 +1 / v7: 한글 4단계에 '두 글자 쓰기'를 끼움 → 옛 4(이름 쓰기)는 5
 const KEY = 'dogyeom-save';
 const BACKUP_KEY = 'dogyeom-save-backup';
 const ADMIN_BACKUP_KEY = 'dogyeom-admin-backup'; // 관리자모드 진입 시 실제 상태 백업
@@ -96,7 +96,10 @@ function buildMerged(saved: any): GameState {
   // 과목/한글 단계: 구세이브·외부 코드 이상값 보정
   const subj = merged.settings.subject;
   merged.settings.subject = subj === 'hangul' || subj === 'mix' ? subj : 'math';
-  merged.settings.hangulLevel = Math.max(1, Math.min(4, Math.round(Number(merged.settings.hangulLevel) || 1)));
+  let hl = Math.round(Number(merged.settings.hangulLevel) || 1);
+  // v7: 한글 4번 자리에 '두 글자 쓰기'가 들어가 '이름 쓰기'가 4→5로 밀렸다 → 옛 저장값 보정
+  if ((saved.schemaVersion || 0) < 7 && hl >= 4) hl = 5;
+  merged.settings.hangulLevel = Math.max(1, Math.min(5, hl));
   if (!Array.isArray(merged.caught)) merged.caught = [];
   if (!Array.isArray(merged.caughtStages)) merged.caughtStages = [];
   if (!Array.isArray(merged.seenStory)) merged.seenStory = [];

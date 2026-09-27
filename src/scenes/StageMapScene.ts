@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
+import { DESIGN, FONT, COLORS, TEXT_RES, regionBgPath } from '../theme';
 import { drawBackground, makeButton, drawStars, applyHiRes, gateSettings, GLOSS3D } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState } from '../systems/save';
@@ -166,7 +166,7 @@ export default class StageMapScene extends Phaser.Scene {
 
     // 전체 배경(지역선택) + 지역별 배틀 이미지 로드 후 박스 렌더
     const files: Record<string, string> = { bg_regions: 'bg/regions.webp?v=1' };
-    REGIONS.forEach((_r, i) => (files[`rbg${i}`] = `bg/r${i}.webp`));
+    REGIONS.forEach((_r, i) => (files[`rbg${i}`] = regionBgPath(i)));
     const need = Object.keys(files).filter((k) => !this.textures.exists(k));
     if (need.length === 0) {
       this.placeRegionsBgAndBoxes();
@@ -252,7 +252,7 @@ export default class StageMapScene extends Phaser.Scene {
     if (this.textures.exists(bgKey)) {
       this.placeStageBg(bgKey);
     } else {
-      this.load.image(bgKey, `bg/r${this.regionIdx}.webp`);
+      this.load.image(bgKey, regionBgPath(this.regionIdx));
       this.load.once(`filecomplete-image-${bgKey}`, () => {
         if (this.view === 'stages' && this.ui.active) this.placeStageBg(bgKey);
       });

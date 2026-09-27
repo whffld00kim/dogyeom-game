@@ -31,16 +31,17 @@ export function makeProblem(s: Settings, rng: () => number = Math.random): Probl
   let a: number, b: number, answer: number;
   if (op === 'add') {
     // 답(합)이 1~max 범위에 들어오도록: 합을 먼저 정하고 두 수로 분해
-    const max = ADD_SUB_PRESETS[idx].max;
-    const sum = randInt(rng, 2, max);
-    a = randInt(rng, 1, sum - 1);
+    // min 이 있으면(100~1000) 두 수 모두 min 이상 — 세 자리 + 세 자리
+    const { max, min = 1 } = ADD_SUB_PRESETS[idx];
+    const sum = randInt(rng, Math.max(2, min * 2), max);
+    a = randInt(rng, min, sum - min);
     b = sum - a;
     answer = sum;
   } else if (op === 'sub') {
-    // 답(차)이 1~max 범위, 음수 없음
-    const max = ADD_SUB_PRESETS[idx].max;
-    a = randInt(rng, 2, max);
-    b = randInt(rng, 1, a - 1);
+    // 답(차)이 1~max 범위, 음수 없음. min 이 있으면 빼는 수·답 모두 min 이상 — 세 자리 − 세 자리 = 세 자리
+    const { max, min = 1 } = ADD_SUB_PRESETS[idx];
+    a = randInt(rng, Math.max(2, min * 2), max);
+    b = randInt(rng, min, a - min);
     answer = a - b;
   } else {
     const p = MUL_DIV_PRESETS[idx];
@@ -77,24 +78,36 @@ export function makeProblem(s: Settings, rng: () => number = Math.random): Probl
         answer = two;
         a = b * answer;
       }
-    } else {
-      // 범위 모드 (답이 1~max)
+    } else if (p.kind === 'twoDigit') {
+      // 두 자리: 곱셈은 두 자리(10~99) × 한 자리(2~9), 나눗셈은 두 자리 ÷ 한 자리(2~9) = 두 자리 몫
       if (op === 'mul') {
-        // 한 인수는 한 자리(2~9), 다른 인수는 곱이 max 이하가 되도록 → 답(곱)이 1~max
-        const f1 = randInt(rng, 2, 9);
-        const f2 = randInt(rng, 1, Math.max(1, Math.floor(p.max / f1)));
-        if (rng() < 0.5) {
-          a = f1;
-          b = f2;
-        } else {
-          a = f2;
-          b = f1;
-        }
+        a = randInt(rng, 10, 99);
+        b = randInt(rng, 2, 9);
         answer = a * b;
       } else {
-        // 나눗셈: 나누는 수는 한 자리(2~9), 몫(답)은 1~max → 항상 나누어떨어짐
+        // 나누어떨어지고 몫도 두 자리(10 이상), 나뉘는 수는 99 이하. 예: 84÷6=14, 91÷7=13
+        // 전엔 나뉘는 수만 두 자리면 돼서 63÷7 같은 구구단 문제가 절반쯤 섞였다 (2026-09-19)
         b = randInt(rng, 2, 9);
-        answer = randInt(rng, 1, p.max);
+        answer = randInt(rng, 10, Math.floor(99 / b)); // b=9 여도 10~11 이 남는다
+        a = b * answer;
+      }
+    } else {
+      // 두 자리끼리: 곱셈은 두 자리(10~99) × 두 자리(10~99)
+      if (op === 'mul') {
+        a = randInt(rng, 10, 99);
+        b = randInt(rng, 10, 99);
+        answer = a * b;
+      } else {
+        // 나눗셈은 두 자리 ÷ 두 자리와 세 자리 ÷ 두 자리를 반반 (몫 2 이상, 항상 나누어떨어짐)
+        if (rng() < 0.5) {
+          // 두 자리 ÷ 두 자리 → 나뉘는 수가 99 이하로 남도록 나누는 수는 10~49
+          b = randInt(rng, 10, 49);
+          answer = randInt(rng, 2, Math.floor(99 / b));
+        } else {
+          // 세 자리 ÷ 두 자리 → 나뉘는 수가 100~999
+          b = randInt(rng, 10, 99);
+          answer = randInt(rng, Math.max(2, Math.ceil(100 / b)), Math.floor(999 / b));
+        }
         a = b * answer;
       }
     }

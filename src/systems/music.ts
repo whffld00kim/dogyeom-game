@@ -18,6 +18,10 @@ const BGM_URL = 'audio/bgm.mp3';
 let bgmEl: HTMLAudioElement | null = null;
 let bgmGain: GainNode | null = null;
 
+// 앱이 백그라운드(홈 버튼·뒤로로 종료·다른 앱 전환)면 true. 이 동안은 어떤 경로로도 소리를 다시 켜지 않는다.
+// 전엔 이 처리가 없어 홈으로 나가도 BGM 이 계속 흘러나왔다 (2026-09-19)
+let appHidden = false;
+
 const F: Record<string, number> = {
   C3: 130.81, D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.0, A3: 220.0, B3: 246.94,
   C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, A4: 440.0, B4: 493.88,
@@ -72,7 +76,7 @@ function ensureBgm() {
 export function startMusic() {
   bgWanted = true;
   ensure();
-  if (!ctx) return;
+  if (!ctx || appHidden) return;
   if (ctx.state === 'suspended') ctx.resume();
   loadBattle(); // 배틀 음악 미리 디코드(첫 배틀 무음 지연 방지)
   ensureBgm();
@@ -84,7 +88,7 @@ function pauseBg() {
   if (bgmEl) bgmEl.pause();
 }
 function resumeBg() {
-  if (!bgWanted || !bgmEl) return;
+  if (!bgWanted || !bgmEl || appHidden) return;
   if (ctx && ctx.state === 'suspended') ctx.resume();
   bgmEl.play().catch(() => {});
 }
@@ -107,7 +111,7 @@ async function loadBattle() {
 export function startBattleMusic() {
   ensure();
   if (!ctx || !master) return;
-  if (ctx.state === 'suspended') ctx.resume();
+  if (ctx.state === 'suspended' && !appHidden) ctx.resume();
   pauseBg();
   if (battleSrc) return; // 이미 재생 중
   const begin = () => {
@@ -136,6 +140,22 @@ export function stopBattleMusic() {
   resumeBg();
 }
 
+/** 앱이 백그라운드로 갈 때: BGM 일시정지 + 오디오 컨텍스트 정지(배틀 음악·효과음까지 무음) */
+export function pauseForBackground() {
+  appHidden = true;
+  if (bgmEl) bgmEl.pause();
+  if (ctx && ctx.state === 'running') ctx.suspend().catch(() => {});
+}
+
+/** 앱으로 돌아왔을 때: 멈추기 전 상태로 복원 (배틀 중이었으면 배틀 음악, 아니면 전체 BGM) */
+export function resumeFromBackground() {
+  if (!appHidden) return;
+  appHidden = false;
+  if (!ctx) return; // 아직 첫 터치 전이면 소리를 켠 적이 없다
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+  if (bgWanted && bgmEl && !battleSrc) bgmEl.play().catch(() => {});
+}
+
 export function setLevel(l: number) {
   level = Math.max(0, Math.min(3, Math.round(l) || 0));
   if (ctx && master) master.gain.setTargetAtTime(GAINS[level], ctx.currentTime, 0.05);
@@ -146,6 +166,7 @@ export function getLevel() {
 }
 
 function sfxReady(): boolean {
+  if (appHidden) return false;
   ensure();
   if (!ctx) return false;
   if (ctx.state === 'suspended') ctx.resume();

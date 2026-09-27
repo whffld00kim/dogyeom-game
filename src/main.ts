@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { App } from '@capacitor/app';
 import { DESIGN, HD } from './theme';
-import { startMusic } from './systems/music';
+import { startMusic, pauseForBackground, resumeFromBackground } from './systems/music';
 import BootScene from './scenes/BootScene';
 import TitleScene from './scenes/TitleScene';
 import SettingsScene from './scenes/SettingsScene';
@@ -22,8 +22,8 @@ const config: Phaser.Types.Core.GameConfig = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     // 백버퍼를 고해상도로: DESIGN(1280x720)×HD. 각 씬은 applyHiRes()로 카메라 HD배 줌 → 좌표는 1280x720 유지.
-    width: DESIGN.width * HD,
-    height: DESIGN.height * HD,
+    width: Math.round(DESIGN.width * HD), // 저사양이면 HD가 소수라 반올림
+    height: Math.round(DESIGN.height * HD),
   },
   render: { antialias: true },
   scene: [BootScene, TitleScene, SettingsScene, StageMapScene, GameScene, ResultScene, DexScene, ShopScene, DialogueScene, DailyScene, DebugScene],
@@ -60,10 +60,22 @@ App.addListener('backButton', () => {
   const top = active[active.length - 1] as Phaser.Scene & { goBack?: () => void };
   const key = top?.scene?.key;
   if (!top || key === 'Title' || key === 'Boot') {
+    pauseForBackground(); // 종료 직전에 소리부터 끈다 (웹뷰가 바로 안 죽으면 음악이 남는다)
     App.exitApp();
   } else if (typeof top.goBack === 'function') {
     top.goBack();
   } else {
+    pauseForBackground();
     App.exitApp();
   }
 }).catch(() => {});
+
+// 홈 버튼·앱 전환·화면 꺼짐 → 소리 끔, 돌아오면 복원. 앱(appStateChange)과 브라우저/PWA(visibilitychange) 양쪽
+App.addListener('appStateChange', ({ isActive }) => {
+  if (isActive) resumeFromBackground();
+  else pauseForBackground();
+}).catch(() => {});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) pauseForBackground();
+  else resumeFromBackground();
+});

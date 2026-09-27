@@ -15,6 +15,13 @@ function rand(n: number): number {
   return Math.floor(Math.random() * n);
 }
 
+/** 배열에서 서로 다른 원소 n개를 무작위로 뽑아 원래 순서대로 돌려준다 (n이 길이 이상이면 전부) */
+export function pickRandom<T>(arr: T[], n: number): T[] {
+  if (n >= arr.length) return [...arr];
+  const idx = shuffle(arr.map((_, i) => i)).slice(0, n).sort((a, b) => a - b);
+  return idx.map((i) => arr[i]);
+}
+
 function shuffle<T>(arr: T[]): T[] {
   for (let i = arr.length - 1; i > 0; i--) {
     const j = rand(i + 1);

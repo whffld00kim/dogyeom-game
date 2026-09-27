@@ -50,6 +50,29 @@ export const COLORS = {
 
 export const GROUND_Y = Math.round(DESIGN.height * 0.74); // 지면 기준선 y
 
+// 저사양 기기 판정 — 램 4GB 이하(navigator.deviceMemory ≤ 4)면 저사양.
+// 갤럭시 탭 A7 Lite(SM-T225N, 램 3GB·PowerVR GPU)가 백버퍼 2560×1600 + 지역 배경 9장(각 ~2800×1600)을
+// 감당 못 해 웹뷰가 죽고 앱이 튕겼다 (2026-09-19). 저사양이면 백버퍼를 화면 실제 픽셀까지만 키우고
+// 지역 배경은 bg/lo/ 의 축소본을 쓴다. 강제 지정: localStorage lowGfx='1'(켜기)/'0'(끄기) 또는 URL ?lowgfx=1
+export const LOW_END = (() => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const q = new URLSearchParams(window.location.search).get('lowgfx');
+    const o = q ?? window.localStorage.getItem('lowGfx');
+    if (o === '1') return true;
+    if (o === '0') return false;
+  } catch {
+    /* 저장소 접근 불가 → 자동 판정 */
+  }
+  const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  return typeof mem === 'number' && mem <= 4;
+})();
+
+/** 지역 배경 경로 — 저사양이면 축소본(bg/lo/, 가로 1536) */
+export function regionBgPath(i: number): string {
+  return LOW_END ? `bg/lo/r${i}.webp` : `bg/r${i}.webp`;
+}
+
 // HiDPI 태블릿에서 캔버스 텍스트가 흐릿해 보이는 것 방지 (텍스트를 기기 배율로 렌더)
 export const TEXT_RES = Math.max(2, Math.min(3, (typeof window !== 'undefined' && window.devicePixelRatio) || 2));
 
@@ -59,5 +82,8 @@ export const TEXT_RES = Math.max(2, Math.min(3, (typeof window !== 'undefined' &
 export const HD = (() => {
   const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
   const sw = typeof window !== 'undefined' && window.screen ? Math.max(window.screen.width, window.screen.height) : DESIGN.width;
-  return Math.max(2, Math.min(3, Math.ceil((sw * dpr) / DESIGN.width)));
+  const need = (sw * dpr) / DESIGN.width;
+  // 저사양: 실제 화면 픽셀까지만 (소수 배율, 1~2). A7 Lite(1340px)는 2 → 약 1.05로 백버퍼 픽셀이 1/4
+  if (LOW_END) return Math.max(1, Math.min(2, need));
+  return Math.max(2, Math.min(3, Math.ceil(need)));
 })();

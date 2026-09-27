@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DESIGN, FONT, COLORS, GROUND_Y, TEXT_RES } from '../theme';
+import { DESIGN, FONT, COLORS, GROUND_Y, TEXT_RES, regionBgPath } from '../theme';
 import { drawBackground, makeButton, addCoinHud, toast, applyHiRes } from '../widgets';
 import { makeStage, stageReward, BIOME_COLORS } from '../systems/stageGenerator';
 import type { Stage } from '../systems/stageGenerator';
@@ -8,7 +8,7 @@ import { gameState, recordStageClear, persist, bumpDailyCatch } from '../systems
 import { catchSpecific, isCaught, addAsh, addPokeIcon, loadPokeSprites, getName, TOTAL, REGIONS } from '../systems/dex';
 import { playCorrect, playWrong, startBattleMusic, stopBattleMusic } from '../systems/music';
 import { TIME_SECONDS } from '../systems/settings';
-import { isSyllable, syllableJamo, composeJamo, makeBlankProblem, makeNameOptions, keypadFor, isCho, isJung, isJongJamo } from '../systems/hangul';
+import { isSyllable, syllableJamo, composeJamo, makeBlankProblem, makeNameOptions, keypadFor, isCho, isJung, isJongJamo, pickRandom } from '../systems/hangul';
 import type { Problem, Settings } from '../types';
 
 export default class GameScene extends Phaser.Scene {
@@ -144,7 +144,7 @@ export default class GameScene extends Phaser.Scene {
       proceed();
       return;
     }
-    this.load.image(bgKey, `bg/r${ri}.webp`);
+    this.load.image(bgKey, regionBgPath(ri));
     this.load.once('complete', proceed);
     this.load.once('loaderror', () => proceed()); // 실패해도 진행(그라데이션 폴백)
     this.load.start();
@@ -308,7 +308,7 @@ export default class GameScene extends Phaser.Scene {
   /** 한글 문제 시작: 레벨별 데이터 생성 → 이름 플래시(보고-가리고-쓰기) → UI. id = 이번 문제의 포켓몬 */
   private startHangulProblem(id: number) {
     this.hWord = getName(id);
-    this.hLevel = Math.max(1, Math.min(4, this.settings.hangulLevel));
+    this.hLevel = Math.max(1, Math.min(5, this.settings.hangulLevel));
     this.hBlankIdx = -1;
 
     if (this.hLevel === 1) {
@@ -331,7 +331,7 @@ export default class GameScene extends Phaser.Scene {
       this.hAnswer = this.hWord;
       this.hOptions = opts;
     } else {
-      // ③④ 쓰기: 슬롯 구성(한글 음절만 편집, 특수문자는 고정)
+      // ③④⑤ 쓰기: 슬롯 구성(한글 음절만 편집, 특수문자는 고정)
       const chars = [...this.hWord];
       const sylIdx = chars.map((c, i) => (isSyllable(c) ? i : -1)).filter((i) => i >= 0);
       if (!sylIdx.length) {
@@ -339,7 +339,9 @@ export default class GameScene extends Phaser.Scene {
         this.showMathProblem();
         return;
       }
-      const blanks = this.hLevel === 3 ? [sylIdx[Math.floor(Math.random() * sylIdx.length)]] : sylIdx;
+      // ③ 한 글자: 음절 자리 하나 / ④ 두 글자: 서로 다른 음절 자리 둘을 랜덤으로(이름이 2음절이면 둘 다) / ⑤ 이름: 전부
+      const blankCount = this.hLevel === 3 ? 1 : this.hLevel === 4 ? 2 : sylIdx.length;
+      const blanks = pickRandom(sylIdx, blankCount);
       this.hSlots = chars.map((c, i) => ({
         ch: c,
         editable: blanks.includes(i),
@@ -391,7 +393,7 @@ export default class GameScene extends Phaser.Scene {
       this.bannerText.setFontSize(40).setText('바르게 쓴 이름은?');
       this.showHangulChoices(this.hOptions);
     } else {
-      this.bannerText.setFontSize(40).setText(this.hLevel === 3 ? '빈칸 글자를 써 보자!' : '이름을 써 보자!');
+      this.bannerText.setFontSize(40).setText(this.hLevel === 3 ? '빈칸 글자를 써 보자!' : this.hLevel === 4 ? '빈칸 두 글자를 써 보자!' : '이름을 써 보자!');
       // 넓은 자모 키패드(최대 8열)와 안 겹치게 적은 오른쪽 구석으로 살짝 물러남
       this.tweens.add({ targets: this.enemy, x: DESIGN.width - 170, scaleX: 0.78, scaleY: 0.78, duration: 300, ease: 'Sine.out' });
       this.buildSlotUI();
@@ -494,7 +496,7 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  /** ③④ 이름 슬롯(글자 칸) 표시 */
+  /** ③④⑤ 이름 슬롯(글자 칸) 표시 */
   private buildSlotUI() {
     const layer = this.add.container(0, 0);
     this.hSlotLayer = layer;
@@ -538,7 +540,7 @@ export default class GameScene extends Phaser.Scene {
     });
   }
 
-  /** ③④ 자모 키패드(필요 자모 + 혼동 미끼, ⌫/✓ 포함 2행) */
+  /** ③④⑤ 자모 키패드(필요 자모 + 혼동 미끼, ⌫/✓ 포함 2행) */
   private buildJamoKeypad() {
     const targets = this.hSlots.filter((s) => s.editable).map((s) => s.target);
     const jamo = keypadFor(targets);

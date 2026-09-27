@@ -151,8 +151,9 @@ export default class SettingsScene extends Phaser.Scene {
       { k: '1', l: '글자 고르기' },
       { k: '2', l: '맞는 글자' },
       { k: '3', l: '한 글자 쓰기' },
-      { k: '4', l: '이름 쓰기' },
-    ], () => String(s.hangulLevel), (k) => (s.hangulLevel = parseInt(k, 10)), { btnH: 54, fs: 20, labelFs: 28 });
+      { k: '4', l: '두 글자 쓰기' },
+      { k: '5', l: '이름 쓰기' },
+    ], () => String(s.hangulLevel), (k) => (s.hangulLevel = parseInt(k, 10)), { btnH: 54, fs: 20, labelFs: 28, btnW: 160, pitch: 172 }); // 5개라 조금 촘촘히 (1280폭 안에)
 
     this.group(160, 552, '실수 허용', [
       { k: '1', l: '1번' },
@@ -270,13 +271,13 @@ export default class SettingsScene extends Phaser.Scene {
     items: { k: string; l: string }[],
     get: () => string,
     set: (k: string) => void,
-    opts: { btnH?: number; fs?: number; labelFs?: number } = {}
+    opts: { btnH?: number; fs?: number; labelFs?: number; btnW?: number; pitch?: number } = {}
   ) {
     this.text(x, y, title, opts.labelFs ?? 30);
     const btns: ButtonContainer[] = [];
     const refresh = () => btns.forEach((b, i) => b.setBg(get() === items[i].k ? COLORS.btnGreen : COLORS.btnGray));
     items.forEach((it, i) => {
-      const b = this.btn(x + 240 + i * 185, y, 170, opts.btnH ?? 58, it.l, () => {
+      const b = this.btn(x + 240 + i * (opts.pitch ?? 185), y, opts.btnW ?? 170, opts.btnH ?? 58, it.l, () => {
         set(it.k);
         refresh();
         saveSettings();

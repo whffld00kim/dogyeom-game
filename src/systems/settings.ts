@@ -32,33 +32,39 @@ export const OP_SYMBOL: Record<Op, string> = {
   div: '÷',
 };
 
-// 덧셈·뺄셈 범위 프리셋 (피연산자 1 ~ max)
+// 덧셈·뺄셈 범위 프리셋. min 이 없으면 답이 1 ~ max, 있으면 두 수 모두 min 이상·답은 max 이하
+// (2026-09-27 위 두 단계를 1~300·1~1000 → 100~300·300~1000 으로: 그 자릿수끼리 계산만 나오게. 개수·순서 그대로라 presetIndex 이관 없음)
 export interface AddSubPreset {
   label: string;
   max: number;
+  min?: number;
 }
 export const ADD_SUB_PRESETS: AddSubPreset[] = [
   { label: '1 ~ 9', max: 9 },
   { label: '1 ~ 20', max: 20 },
   { label: '1 ~ 100', max: 100 },
-  { label: '1 ~ 300', max: 300 },
-  { label: '1 ~ 1000', max: 1000 },
+  { label: '100 ~ 300', min: 100, max: 300 },
+  { label: '300 ~ 1000', min: 300, max: 1000 },
 ];
 
-// 곱셈·나눗셈 프리셋 (단 모드: 해당 단 × 1~9 / 두 자리 쉬움: 받아올림 없는 두 자리×한 자리 / 범위 모드: 1~max)
+// 곱셈·나눗셈 프리셋 (단 모드: 해당 단 × 1~9 / 두 자리 쉬움: 받아올림 없는 두 자리×한 자리 /
+// 두 자리: 두 자리×한 자리·두 자리÷한 자리 / 두 자리끼리: 두 자리×두 자리·두세 자리÷두 자리)
 // ⚠ 순서를 바꾸거나 중간에 끼우면 저장된 presetIndex 가 밀린다 → save.ts 의 SCHEMA_VERSION 마이그레이션도 함께
 export type MulDivPreset =
   | { label: string; kind: 'dan'; danMin: number; danMax: number }
   | { label: string; kind: 'twoDigitNoCarry' }
-  | { label: string; kind: 'range'; max: number };
+  | { label: string; kind: 'twoDigit' }
+  | { label: string; kind: 'twoByTwo' };
 export const MUL_DIV_PRESETS: MulDivPreset[] = [
   { label: '2~5단', kind: 'dan', danMin: 2, danMax: 5 },
   { label: '4~9단', kind: 'dan', danMin: 4, danMax: 9 },
   { label: '1~9단', kind: 'dan', danMin: 1, danMax: 9 },
-  // 1~9단과 1~100(두 자리×한 자리, 초3) 사이의 한 계단: 12×3, 21×4, 84÷4 처럼 받아올림이 없는 것만 (2026-09-10)
+  // 1~9단과 '두 자리'(초3) 사이의 한 계단: 12×3, 21×4, 84÷4 처럼 받아올림이 없는 것만 (2026-09-10)
   { label: '두 자리 쉬움', kind: 'twoDigitNoCarry' },
-  { label: '1~100', kind: 'range', max: 100 },
-  { label: '1~1000', kind: 'range', max: 1000 },
+  // 두 자리: 받아올림까지 있는 두 자리×한 자리(37×6), 나눗셈은 두 자리÷한 자리 몫 두 자리(84÷6=14) (2026-09-18, 몫 조건 09-19)
+  { label: '두 자리', kind: 'twoDigit' },
+  // 두 자리끼리: 곱셈은 두 자리×두 자리(47×63), 나눗셈은 두·세 자리÷두 자리(98÷49, 672÷24) (2026-09-18)
+  { label: '두 자리끼리', kind: 'twoByTwo' },
 ];
 
 export function presetCount(op: Op): number {

@@ -18,7 +18,7 @@ export interface Settings {
   timeLevel: TimeLevel;
   maxMiss: number; // 10문제 중 틀려도 포켓몬을 잡을 수 있는 최대 횟수 (1/2/3/5)
   subject: Subject; // 과목: 수학 / 한글 / 섞기(수학·한글 반반)
-  hangulLevel: number; // 한글 단계 1~4 (글자 고르기/맞는 글자/한 글자 쓰기/이름 쓰기)
+  hangulLevel: number; // 한글 단계 1~5 (글자 고르기/맞는 글자/한 글자 쓰기/두 글자 쓰기/이름 쓰기) — 4 '두 글자 쓰기'는 2026-09-13 추가
   mixEasier: boolean; // 쉬운 문제 섞기: 켜면 고른 프리셋보다 낮은 단계 문제가 반씩 섞인다 (2026-09-10)
 }
 
