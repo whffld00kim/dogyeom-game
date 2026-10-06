@@ -5,11 +5,11 @@ import { makeStage, stageReward, BIOME_COLORS } from '../systems/stageGenerator'
 import type { Stage } from '../systems/stageGenerator';
 import { makeProblem } from '../systems/mathGenerator';
 import { gameState, recordStageClear, persist, bumpDailyCatch } from '../systems/save';
-import { catchSpecific, isCaught, addAsh, addPokeIcon, loadPokeSprites, getName, TOTAL, REGIONS } from '../systems/dex';
+import { catchSpecific, isCaught, isShiny, catchShiny, addSparkles, SHINY_GOLD_CSS, addAsh, addPokeIcon, loadPokeSprites, getName, TOTAL, REGIONS } from '../systems/dex';
 import { playCorrect, playWrong, startBattleMusic, stopBattleMusic } from '../systems/music';
-import { TIME_SECONDS } from '../systems/settings';
+import { TIME_SECONDS, presetCount, clampPresetIndex } from '../systems/settings';
 import { isSyllable, syllableJamo, composeJamo, makeBlankProblem, makeNameOptions, keypadFor, isCho, isJung, isJongJamo, pickRandom } from '../systems/hangul';
-import type { Problem, Settings } from '../types';
+import type { Problem, Settings, Op } from '../types';
 
 export default class GameScene extends Phaser.Scene {
   private index = 1;
@@ -30,6 +30,7 @@ export default class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Image | Phaser.GameObjects.Container;
   private enemy!: Phaser.GameObjects.Container;
   private targetId = 1; // 이 스테이지의 목표 포켓몬 (번호 = 스테이지 번호)
+  private shinyRun = false; // 반짝이 도전: 보통은 이미 잡았고 반짝이는 아직 → 문제를 한 단계 올려 낸다 (2026-10-06)
   private readonly enemySize = 150;
   private readonly enemyY = GROUND_Y - 70;
   private answerLayer!: Phaser.GameObjects.Container;
@@ -62,6 +63,17 @@ export default class GameScene extends Phaser.Scene {
     startBattleMusic(); // 배틀 음악 무한 재생
     this.events.once('shutdown', stopBattleMusic); // 배틀 나가면 정지 + 합성 BGM 복원
     this.settings = gameState.settings;
+    this.targetId = Phaser.Math.Clamp(this.index, 1, TOTAL);
+    // 반짝이 도전이면 설정 사본에서 켜진 연산마다 프리셋을 한 칸 올리고(끝이면 그대로), 쉬운 문제 섞기는 끈다. 한글도 한 단계 위
+    this.shinyRun = isCaught(this.targetId) && !isShiny(this.targetId);
+    if (this.shinyRun) {
+      const ops = {} as Settings['ops'];
+      (Object.keys(this.settings.ops) as Op[]).forEach((op) => {
+        const o = this.settings.ops[op];
+        ops[op] = { enabled: o.enabled, presetIndex: Math.min(presetCount(op) - 1, clampPresetIndex(op, o.presetIndex) + 1) };
+      });
+      this.settings = { ...this.settings, ops, mixEasier: false, hangulLevel: Math.min(5, this.settings.hangulLevel + 1) };
+    }
     this.stage = makeStage(this.index, this.settings);
     this.total = this.stage.problems;
     this.solved = 0;
@@ -76,12 +88,12 @@ export default class GameScene extends Phaser.Scene {
     makeButton(this, 70, 56, 110, 58, '⏸', () => this.scene.start('StageMap'), { fontSize: 30, bg: 0x10151f, alpha: 0.42, color: '#ffffff' });
     addCoinHud(this);
     this.add
-      .text(DESIGN.width / 2, 22, `스테이지 ${this.index} · ${this.stage.biome}`, {
+      .text(DESIGN.width / 2, 22, this.shinyRun ? `✨ 반짝이 도전! · 스테이지 ${this.index}` : `스테이지 ${this.index} · ${this.stage.biome}`, {
         fontFamily: FONT,
         fontSize: '22px',
-        color: '#ffffff',
+        color: this.shinyRun ? '#ffe28a' : '#ffffff',
         fontStyle: 'bold',
-        stroke: '#2b2018',
+        stroke: this.shinyRun ? '#6b4a00' : '#2b2018',
         strokeThickness: 4,
         resolution: TEXT_RES,
       })
@@ -102,7 +114,6 @@ export default class GameScene extends Phaser.Scene {
     this.tweens.add({ targets: this.player, y: GROUND_Y - 60, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     // 적 = 이 스테이지의 목표 포켓몬(번호 = 스테이지). 매 문제 같은 포켓몬과 대결 → 클리어 시 포획.
     this.enemy = this.add.container(DESIGN.width + 80, this.enemyY);
-    this.targetId = Phaser.Math.Clamp(this.index, 1, TOTAL);
 
     // 피드백
     this.feedback = this.add
@@ -161,14 +172,16 @@ export default class GameScene extends Phaser.Scene {
   /** 적 컨테이너 내용을 지정 포켓몬으로 교체. 이름 라벨은 수학 과목에서만(한글 문제 정답 노출 방지) */
   private setEnemyPokemon(id: number) {
     this.enemy.removeAll(true);
-    this.enemy.add(addPokeIcon(this, 0, 0, id, this.enemySize));
+    const shiny = this.shinyRun && id === this.targetId; // 반짝이 도전의 목표 포켓몬은 반짝이 색 + 별 가루
+    this.enemy.add(addPokeIcon(this, 0, 0, id, this.enemySize, shiny));
+    if (shiny) this.enemy.add(addSparkles(this, 0, 0, this.enemySize));
     if (this.settings.subject === 'math') {
       this.enemy.add(
         this.add
-          .text(0, -this.enemySize * 0.62, getName(id), {
+          .text(0, -this.enemySize * 0.62, (shiny ? '✨ ' : '') + getName(id), {
             fontFamily: FONT,
             fontSize: '28px',
-            color: '#2b3a67',
+            color: shiny ? SHINY_GOLD_CSS : '#2b3a67',
             fontStyle: 'bold',
             stroke: '#ffffff',
             strokeThickness: 6,
@@ -748,6 +761,7 @@ export default class GameScene extends Phaser.Scene {
 
     // 포획: 이 스테이지의 포켓몬(번호=스테이지)을 잡음. 실수 maxMiss번까지 OK, 넘으면 실패(재도전 시 기회).
     let caught: number | null = null;
+    let shiny: number | null = null; // 이번에 잡은 반짝이
     let missedCatch = false;
     let counted = false; // 오늘 기록(1마리=1분)에 포함됐는지
     if (!isCaught(this.targetId)) {
@@ -763,12 +777,15 @@ export default class GameScene extends Phaser.Scene {
         missedCatch = true;
       }
     } else if (this.mistakes <= this.settings.maxMiss) {
-      // 이미 잡은 포켓몬이라도 오늘 다시 도전해서 잡았으면 오늘 기록에 추가
+      // 이미 잡은 포켓몬이라도 오늘 다시 도전해서 잡았으면 오늘 기록에 추가. 반짝이 도전이었으면 반짝이도 잡힘
+      if (this.shinyRun) shiny = catchShiny(this.targetId);
       bumpDailyCatch();
       counted = true;
       persist();
+    } else if (this.shinyRun) {
+      missedCatch = true; // 반짝이를 놓침 — 다시 도전하면 됨
     }
-    this.scene.start('Result', { index: this.index, stars, reward, caught, missedCatch, counted });
+    this.scene.start('Result', { index: this.index, stars, reward, caught, shiny, shinyTry: this.shinyRun, missedCatch, counted });
   }
 
   /** 하드웨어 백버튼 / 일시정지 → 스테이지 선택으로 */

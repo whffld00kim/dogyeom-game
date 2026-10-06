@@ -2,31 +2,35 @@ import Phaser from 'phaser';
 import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, drawStars, applyHiRes } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
-import { getName, loadPokeSprites, addPokeIcon } from '../systems/dex';
+import { getName, loadPokeSprites, addPokeIcon, addSparkles, SHINY_GOLD, SHINY_GOLD_CSS } from '../systems/dex';
 import { playCatch } from '../systems/music';
 import { gameState, todayKey } from '../systems/save';
 
+type ResultData = { index: number; stars: number; reward: number; caught: number | null; shiny?: number | null; shinyTry?: boolean; missedCatch?: boolean; counted?: boolean };
+
 export default class ResultScene extends Phaser.Scene {
-  private rdata!: { index: number; stars: number; reward: number; caught: number | null; missedCatch?: boolean; counted?: boolean };
+  private rdata!: ResultData;
 
   constructor() {
     super('Result');
   }
 
-  init(data: { index: number; stars: number; reward: number; caught: number | null; missedCatch?: boolean; counted?: boolean }) {
+  init(data: ResultData) {
     this.rdata = data;
   }
 
   create() {
     applyHiRes(this);
-    const { index, stars, reward, caught, missedCatch } = this.rdata;
+    const { index, stars, reward, caught, missedCatch, shinyTry } = this.rdata;
+    const shiny = this.rdata.shiny ?? null;
     drawBackground(this, BIOME_COLORS['초원']);
     addCoinHud(this);
 
     const hasCatch = caught != null;
-    if (hasCatch) playCatch();
+    const hasShiny = shiny != null;
+    if (hasCatch || hasShiny) playCatch();
     const pw = 660;
-    const ph = hasCatch || missedCatch ? 520 : 420;
+    const ph = hasCatch || hasShiny || missedCatch ? 520 : 420;
     const px = DESIGN.width / 2;
     const py = DESIGN.height / 2 + 10;
     const top = py - ph / 2;
@@ -36,7 +40,7 @@ export default class ResultScene extends Phaser.Scene {
     g.fillRoundedRect(px - pw / 2, py - ph / 2 + 6, pw, ph, 28);
     g.fillStyle(0xffffff, 0.97);
     g.fillRoundedRect(px - pw / 2, py - ph / 2, pw, ph, 28);
-    g.lineStyle(5, COLORS.panel, 1);
+    g.lineStyle(5, hasShiny ? SHINY_GOLD : COLORS.panel, 1);
     g.strokeRoundedRect(px - pw / 2, py - ph / 2, pw, ph, 28);
 
     this.add
@@ -53,7 +57,38 @@ export default class ResultScene extends Phaser.Scene {
         .setOrigin(0.5);
     }
 
-    if (hasCatch) {
+    if (hasShiny) {
+      // 반짝이 포획 — 금빛 제목 + 반짝이 색 아이콘 + 별 가루
+      const cy = top + 296;
+      this.add
+        .text(px + 6, cy, `✨ 반짝이 ${getName(shiny!)}\n잡았다! 🎉`, {
+          fontFamily: FONT,
+          fontSize: '30px',
+          color: SHINY_GOLD_CSS,
+          fontStyle: 'bold',
+          align: 'left',
+          lineSpacing: 6,
+          resolution: TEXT_RES,
+        })
+        .setOrigin(0, 0.5);
+      loadPokeSprites(this, [shiny!], () => {
+        const icon = addPokeIcon(this, px - 96, cy, shiny!, 96, true) as Phaser.GameObjects.Image;
+        const ns = icon.scaleX || 1;
+        icon.setScale(0);
+        this.tweens.add({ targets: icon, scaleX: ns, scaleY: ns, duration: 440, ease: 'Back.easeOut' });
+        addSparkles(this, px - 96, cy, 110, 7);
+      });
+      const tn = gameState.dailyCatch[todayKey()] || 0;
+      this.add
+        .text(px, cy + 70, `오늘 ${tn}마리째! · 🎮 로블록스 ${tn}분`, {
+          fontFamily: FONT,
+          fontSize: '24px',
+          color: '#2e9e4f',
+          fontStyle: 'bold',
+          resolution: TEXT_RES,
+        })
+        .setOrigin(0.5);
+    } else if (hasCatch) {
       const cy = top + 296;
       this.add
         .text(px + 6, cy, `${getName(caught!)}\n잡았다! 🎉`, {
@@ -86,7 +121,7 @@ export default class ResultScene extends Phaser.Scene {
     } else if (missedCatch) {
       const cy = top + 290;
       this.add
-        .text(px, cy, '아쉽다! 실수가 많아서\n포켓몬도 코인도 놓쳤어요 😢\n다시 도전하면 잡을 수 있어요!', {
+        .text(px, cy, shinyTry ? '아쉽다! 실수가 많아서\n반짝이를 놓쳤어요 😢\n다시 도전하면 잡을 수 있어요!' : '아쉽다! 실수가 많아서\n포켓몬도 코인도 놓쳤어요 😢\n다시 도전하면 잡을 수 있어요!', {
           fontFamily: FONT,
           fontSize: '26px',
           color: '#e0556b',

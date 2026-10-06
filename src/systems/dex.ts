@@ -187,8 +187,160 @@ export function addAsh(scene: Phaser.Scene, x: number, y: number, size: number):
   return c;
 }
 
-/** 포켓몬 아이콘 생성: 스프라이트가 있으면 이미지, 없으면 색 원(placeholder). */
-export function addPokeIcon(scene: Phaser.Scene, x: number, y: number, id: number, size: number): Phaser.GameObjects.GameObject {
+// ── 반짝이(색이 다른 포켓몬) — 2026-10-06 ──
+// 도감을 다 채운 뒤에도 잡을 거리가 남게, 이미 잡은 스테이지를 한 단계 어려운 문제로 다시 깨면 '반짝이'가 잡힌다.
+// 그림은 새로 넣지 않고 원본 스프라이트의 색상(hue)만 돌려 캔버스 텍스처로 만든다(용량 無). 흰색·검은 테두리는 그대로.
+export const SHINY_GOLD = 0xffc428;
+export const SHINY_GOLD_CSS = '#c98a00';
+
+export function isShiny(id: number): boolean {
+  return gameState.shiny.includes(id);
+}
+export function shinyCount(): number {
+  return gameState.shiny.length;
+}
+/** 반짝이 포획. 보통을 아직 안 잡았거나 이미 반짝이면 null. */
+export function catchShiny(id: number): number | null {
+  if (id < 1 || id > TOTAL) return null;
+  if (!gameState.caught.includes(id) || gameState.shiny.includes(id)) return null;
+  gameState.shiny.push(id);
+  persist();
+  return id;
+}
+export function shinyKey(id: number): string {
+  return `poke_shiny_${id}`;
+}
+/** 도감 메인 그림이 반짝이인지(반짝이를 잡은 것만 의미 있음) */
+export function isShinyMain(id: number): boolean {
+  return isShiny(id) && gameState.shinyMain.includes(id);
+}
+/** 도감 칸 톡: 메인 그림을 반짝이 ↔ 보통으로. 반짝이를 안 잡았으면 false */
+export function toggleShinyMain(id: number): boolean {
+  if (!isShiny(id)) return false;
+  const i = gameState.shinyMain.indexOf(id);
+  if (i >= 0) gameState.shinyMain.splice(i, 1);
+  else gameState.shinyMain.push(id);
+  persist();
+  return true;
+}
+
+// 반짝이 색 후보(도 단위): 금 · 얼음 · 보라 · 장미 · 에메랄드 · 바다 · 청록 · 진홍 · 자홍 · 초록.
+// 원본의 주된 색에서 100° 이상 떨어진 것만 골라 "같은 포켓몬인데 색이 확 다르다"가 되게 한다.
+// (처음엔 70°·라임·코랄도 넣었는데 이상해씨가 올리브, 팬텀이 카키가 돼 칙칙했다 — 2026-10-06 미리 보기로 확인)
+const SHINY_HUES = [48, 205, 275, 335, 150, 230, 180, 0, 300, 120];
+const SHINY_MIN_DIST = 100;
+
+function rgb2hsv(r: number, g: number, b: number): [number, number, number] {
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let h = 0;
+  if (d > 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return [h, max === 0 ? 0 : d / max, max / 255];
+}
+function hsv2rgb(h: number, s: number, v: number): [number, number, number] {
+  const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+function hueDist(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360;
+  return d > 180 ? 360 - d : d;
+}
+/** 이 포켓몬의 반짝이 목표 색. id마다 정해져 있어 늘 같은 색이 나온다 */
+export function shinyTargetHue(id: number, dominant: number): number {
+  const n = SHINY_HUES.length;
+  let i = (id * 7 + Math.round(dominant / 36)) % n;
+  for (let k = 0; k < n; k++) {
+    const h = SHINY_HUES[(i + k) % n];
+    if (hueDist(h, dominant) >= SHINY_MIN_DIST) return h;
+  }
+  return SHINY_HUES[i];
+}
+
+/** 원본 스프라이트(poke_{id})가 로드돼 있으면 반짝이 텍스처를 만든다. 만들었거나 이미 있으면 true */
+export function ensureShinyTexture(scene: Phaser.Scene, id: number): boolean {
+  const key = shinyKey(id);
+  if (scene.textures.exists(key)) return true;
+  const base = pokeKey(id);
+  if (!scene.textures.exists(base)) return false;
+  try {
+    const src = scene.textures.get(base).getSourceImage() as HTMLImageElement;
+    const w = src.width as number, h = src.height as number;
+    const cv = document.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    const ctx = cv.getContext('2d', { willReadFrequently: true })!;
+    ctx.drawImage(src as CanvasImageSource, 0, 0);
+    const img = ctx.getImageData(0, 0, w, h);
+    const d = img.data;
+    // 1) 주된 색: 채도·밝기 있는 픽셀의 hue 히스토그램(36칸)
+    const bins = new Float32Array(36);
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 32) continue;
+      const [hh, s, v] = rgb2hsv(d[i], d[i + 1], d[i + 2]);
+      if (s < 0.3 || v < 0.25) continue;
+      bins[Math.floor(hh / 10) % 36] += s * v;
+    }
+    let best = 0;
+    for (let b = 1; b < 36; b++) if (bins[b] > bins[best]) best = b;
+    const dominant = best * 10 + 5;
+    const shift = shinyTargetHue(id, dominant) - dominant;
+    // 2) 색 돌리기 — 흰색·회색·검은 테두리(채도 낮거나 아주 어두움)는 그대로, 나머지는 hue 이동 + 채도 살짝 올림
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] === 0) continue;
+      const [hh, s, v] = rgb2hsv(d[i], d[i + 1], d[i + 2]);
+      if (s < 0.12 || v < 0.18) continue;
+      const [r, g, b] = hsv2rgb((((hh + shift) % 360) + 360) % 360, Math.min(1, s * 1.2), Math.min(1, v * 1.03));
+      d[i] = r;
+      d[i + 1] = g;
+      d[i + 2] = b;
+    }
+    ctx.putImageData(img, 0, 0);
+    scene.textures.addCanvas(key, cv);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 반짝이 별 가루: (x,y) 주위 size 안에 금빛 별 n개가 번갈아 반짝인다. 담은 컨테이너가 파괴되면 트윈도 정리 */
+export function addSparkles(scene: Phaser.Scene, x: number, y: number, size: number, n = 6): Phaser.GameObjects.Container {
+  const c = scene.add.container(x, y);
+  const tweens: Phaser.Tweens.Tween[] = [];
+  for (let i = 0; i < n; i++) {
+    const ang = (Math.PI * 2 * i) / n + (i % 2) * 0.4;
+    const rad = size * (0.42 + (i % 3) * 0.08);
+    const r = size * (0.06 + (i % 2) * 0.03);
+    const st = scene.add.star(Math.cos(ang) * rad, Math.sin(ang) * rad * 0.85, 4, r * 0.38, r, SHINY_GOLD);
+    st.setStrokeStyle(Math.max(1, r * 0.18), 0xffffff, 0.9);
+    st.setScale(0.4).setAlpha(0.5);
+    c.add(st);
+    tweens.push(
+      scene.tweens.add({ targets: st, scale: { from: 0.4, to: 1.1 }, alpha: { from: 0.5, to: 1 }, angle: 25, duration: 520 + i * 70, yoyo: true, repeat: -1, delay: i * 140, ease: 'Sine.inOut' }),
+    );
+  }
+  c.once('destroy', () => tweens.forEach((t) => t.remove()));
+  return c;
+}
+
+/** 포켓몬 아이콘 생성: 스프라이트가 있으면 이미지, 없으면 색 원(placeholder). shiny면 반짝이 텍스처(원본이 있어야 함) */
+export function addPokeIcon(scene: Phaser.Scene, x: number, y: number, id: number, size: number, shiny = false): Phaser.GameObjects.GameObject {
+  if (shiny && ensureShinyTexture(scene, id)) {
+    const img = scene.add.image(x, y, shinyKey(id));
+    img.setScale(size / Math.max(img.width, img.height));
+    return img;
+  }
   if (scene.textures.exists(pokeKey(id))) {
     const img = scene.add.image(x, y, pokeKey(id));
     img.setScale(size / Math.max(img.width, img.height));

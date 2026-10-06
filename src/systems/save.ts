@@ -3,7 +3,7 @@ import type { Settings } from '../types';
 import { defaultSettings } from './settings';
 import POKEMON_DATA from '../data/pokemon.json';
 
-const SCHEMA_VERSION = 7; // v6: 곱셈·나눗셈 프리셋 '두 자리 쉬움'을 3번에 끼움 → 그 뒤 인덱스 +1 / v7: 한글 4단계에 '두 글자 쓰기'를 끼움 → 옛 4(이름 쓰기)는 5
+const SCHEMA_VERSION = 8; // v6: 곱셈·나눗셈 프리셋 '두 자리 쉬움'을 3번에 끼움 → 그 뒤 인덱스 +1 / v7: 한글 4단계에 '두 글자 쓰기'를 끼움 → 옛 4(이름 쓰기)는 5 / v8: shiny(반짝이) 목록 추가
 const KEY = 'dogyeom-save';
 const BACKUP_KEY = 'dogyeom-save-backup';
 const ADMIN_BACKUP_KEY = 'dogyeom-admin-backup'; // 관리자모드 진입 시 실제 상태 백업
@@ -28,6 +28,8 @@ export interface GameState {
   soundLevel: number; // 0 끔 / 1 작게 / 2 보통 / 3 크게
   adminMode?: boolean; // 관리자(검증) 모드 — 켜면 코인 99999 + 전 포켓몬 포획(끄면 원복)
   dailyCatch: Record<string, number>; // 'YYYY-MM-DD'(기기 로컬 날짜) → 그날 잡은 포켓몬 수
+  shiny: number[]; // 반짝이(색이 다른 버전)까지 잡은 포켓몬 id — 이미 잡은 스테이지를 한 단계 어려운 문제로 다시 깨면 (2026-10-06)
+  shinyMain: number[]; // 도감에서 반짝이를 메인 그림으로 둔 포켓몬 id (도감 칸을 톡 하면 바뀜, 2026-10-06)
 }
 
 export function createDefault(): GameState {
@@ -47,6 +49,8 @@ export function createDefault(): GameState {
     soundLevel: 2,
     adminMode: false,
     dailyCatch: {},
+    shiny: [],
+    shinyMain: [],
   };
 }
 
@@ -106,6 +110,8 @@ function buildMerged(saved: any): GameState {
   if (!Array.isArray(merged.ownedItems)) merged.ownedItems = [];
   if (!merged.equipped || typeof merged.equipped !== 'object') merged.equipped = {};
   if (!merged.dailyCatch || typeof merged.dailyCatch !== 'object' || Array.isArray(merged.dailyCatch)) merged.dailyCatch = {};
+  if (!Array.isArray(merged.shiny)) merged.shiny = []; // v8 이전 저장엔 없음
+  if (!Array.isArray(merged.shinyMain)) merged.shinyMain = [];
   // 구버전(지우 단일 꾸미기: 슬롯→아이템 평면 구조) 감지 → 포켓몬별 구조로 리셋
   if (Object.values(merged.equipped).some((v) => typeof v === 'string')) merged.equipped = {};
   // v4: 꾸미기 아이템 id 형식 변경(이모지→벡터, 슬롯 6개) → 구버전 꾸미기만 1회 초기화 (코인·도감·별은 유지)

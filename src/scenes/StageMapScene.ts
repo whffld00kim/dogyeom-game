@@ -3,7 +3,7 @@ import { DESIGN, FONT, COLORS, TEXT_RES, regionBgPath } from '../theme';
 import { drawBackground, makeButton, drawStars, applyHiRes, gateSettings, GLOSS3D } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState } from '../systems/save';
-import { REGIONS, isCaught, loadPokeSprites, addPokeIcon } from '../systems/dex';
+import { REGIONS, isCaught, isShiny, loadPokeSprites, addPokeIcon, SHINY_GOLD } from '../systems/dex';
 import type { Region } from '../systems/dex';
 import { regionIntro } from '../systems/story';
 
@@ -192,10 +192,11 @@ export default class StageMapScene extends Phaser.Scene {
       const x = startX + col * cellW, y = startY + row * cellH;
       const total = r.end - r.start + 1;
       const got = gameState.caught.filter((id) => id >= r.start && id <= r.end).length;
+      const sh = gameState.shiny.filter((id) => id >= r.start && id <= r.end).length;
       const done = got >= total;
       this.makeRegionBox(x, y, r, i, done);
       this.ui.add(
-        this.add.text(x, y + 66, `${got} / ${total} 마리 ${done ? '✓' : ''}`, { fontFamily: FONT, fontSize: '21px', color: '#ffffff', fontStyle: 'bold', stroke: '#2b3a67', strokeThickness: 5, resolution: TEXT_RES }).setOrigin(0.5),
+        this.add.text(x, y + 66, `${got} / ${total} 마리 ${done ? '✓' : ''}${sh > 0 ? ` · ✨ ${sh}` : ''}`, { fontFamily: FONT, fontSize: '21px', color: '#ffffff', fontStyle: 'bold', stroke: '#2b3a67', strokeThickness: 5, resolution: TEXT_RES }).setOrigin(0.5),
       );
     });
   }
@@ -266,8 +267,9 @@ export default class StageMapScene extends Phaser.Scene {
     const pages = this.pageCount();
     this.page = Phaser.Math.Clamp(this.page, 0, pages - 1);
     const got = gameState.caught.filter((id) => id >= region.start && id <= region.end).length;
+    const sh = gameState.shiny.filter((id) => id >= region.start && id <= region.end).length;
     this.ui.add(
-      this.add.text(DESIGN.width / 2, 92, `잡은 포켓몬 ${got} / ${count}`, { fontFamily: FONT, fontSize: '22px', color: '#ffffff', fontStyle: 'bold', stroke: '#16233f', strokeThickness: 4, resolution: TEXT_RES }).setOrigin(0.5),
+      this.add.text(DESIGN.width / 2, 92, `잡은 포켓몬 ${got} / ${count} · ✨ 반짝이 ${sh}`, { fontFamily: FONT, fontSize: '22px', color: '#ffffff', fontStyle: 'bold', stroke: '#16233f', strokeThickness: 4, resolution: TEXT_RES }).setOrigin(0.5),
     );
 
     if (pages > 1) {
@@ -318,14 +320,17 @@ export default class StageMapScene extends Phaser.Scene {
   private makeNode(grid: Phaser.GameObjects.Container, x: number, y: number, n: number) {
     const stars = gameState.stageStars[n] ?? 0;
     const caught = isCaught(n);
+    const shiny = isShiny(n); // 반짝이까지 잡은 스테이지는 금테 + 반짝이 색 그림 (2026-10-06)
 
     const c = this.add.container(x, y);
-    const card = this.add.circle(0, 0, 46, caught ? 0xd9f5d9 : 0xeaf0ff);
-    card.setStrokeStyle(5, caught ? 0x36a45a : 0xffffff);
+    const card = this.add.circle(0, 0, 46, shiny ? 0xfff3c4 : caught ? 0xd9f5d9 : 0xeaf0ff);
+    card.setStrokeStyle(5, shiny ? SHINY_GOLD : caught ? 0x36a45a : 0xffffff);
     c.add(card);
-    c.add(addPokeIcon(this, 0, 0, n, 76));
+    c.add(addPokeIcon(this, 0, 0, n, 76, shiny));
     c.add(this.add.text(0, 50, `${n}`, { fontFamily: FONT, fontSize: '16px', color: '#ffffff', fontStyle: 'bold', stroke: '#16233f', strokeThickness: 4, resolution: TEXT_RES }).setOrigin(0.5));
-    if (caught) {
+    if (shiny) {
+      c.add(this.add.star(33, -33, 5, 6, 14, SHINY_GOLD).setStrokeStyle(3, 0xffffff));
+    } else if (caught) {
       c.add(this.add.circle(33, -33, 13, 0x36a45a).setStrokeStyle(3, 0xffffff));
       c.add(this.add.text(33, -33, '✓', { fontFamily: FONT, fontSize: '15px', color: '#ffffff', fontStyle: 'bold', resolution: TEXT_RES }).setOrigin(0.5));
     }
