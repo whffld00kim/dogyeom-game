@@ -4,11 +4,12 @@ import { TEXT_RES } from '../theme';
 import { drawBackground, makeButton, ButtonContainer, applyHiRes, GLOSS3D } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState, saveSettings, exportSave, importSave, isAdmin, enterAdmin, exitAdmin, getSettingsPw, setSettingsPw, resetSettingsPw, DEFAULT_SETTINGS_PW } from '../systems/save';
-import { OP_LABEL, presetLabel, presetCount } from '../systems/settings';
+import { OP_LABEL, presetLabel, presetCount, catchSettingsOf } from '../systems/settings';
 import { setLevel, startMusic } from '../systems/music';
-import type { Op, Subject } from '../types';
+import type { Op, Subject, CatchSettings } from '../types';
 
-/** 설정 화면 — 2페이지: ①게임 모드(과목/연산/한글 단계/실수 허용) ②소리·모드·답하기·제한시간·보호자 비밀번호.
+/** 설정 화면 — 3페이지 (2026-10-10 잡기 설정을 둘로 나눔):
+ *  ①일반 몬스터 잡기(과목/연산/한글 단계/실수 허용/섞기) ②반짝이 몬스터 잡기(같은 항목, 따로 저장) ③소리·모드·답하기·제한시간·보호자 비밀번호.
  *  좌우 화살표 + 스와이프로 전환(버튼 위에서 시작한 드래그는 스와이프로 안 침). */
 export default class SettingsScene extends Phaser.Scene {
   private page = 0;
@@ -60,20 +61,25 @@ export default class SettingsScene extends Phaser.Scene {
     this.ui.removeAll(true);
     this.btnRects = [];
 
-    this.text(DESIGN.width / 2, 42, '게임 설정', 44, 0.5);
-    this.text(DESIGN.width / 2, 88, `${this.page + 1} / 2  (좌우로 넘겨요)`, 20, 0.5);
+    const titles = ['🎯 일반 몬스터 잡기', '✨ 반짝이 몬스터 잡기', '🔊 소리 · 보호자'];
+    this.text(DESIGN.width / 2, 42, '게임 설정 — ' + titles[this.page], 40, 0.5);
+    this.text(DESIGN.width / 2, 88, `${this.page + 1} / ${SettingsScene.PAGES}  (좌우로 넘겨요)`, 20, 0.5);
 
-    if (this.page === 0) this.renderPage1();
-    else this.renderPage2();
+    const s = gameState.settings;
+    if (this.page === 0) this.renderCatchPage(s, false); // 일반: 최상위 칸을 그대로 고친다
+    else if (this.page === 1) this.renderCatchPage(catchSettingsOf(s, true), true); // 반짝이: s.shiny 객체를 그대로 고친다
+    else this.renderPage3();
     this.renderBottom();
 
     // 페이지 이동 화살표
-    if (this.page === 0) this.btn(DESIGN.width - 44, 360, 52, 72, '▶', () => this.changePage(1), { ...GLOSS3D, fontSize: 24 });
-    else this.btn(44, 360, 52, 72, '◀', () => this.changePage(-1), { ...GLOSS3D, fontSize: 24 });
+    if (this.page < SettingsScene.PAGES - 1) this.btn(DESIGN.width - 44, 470, 52, 72, '▶', () => this.changePage(1), { ...GLOSS3D, fontSize: 24 });
+    if (this.page > 0) this.btn(44, 470, 52, 72, '◀', () => this.changePage(-1), { ...GLOSS3D, fontSize: 24 });
   }
 
+  private static readonly PAGES = 3;
+
   private changePage(d: number) {
-    const np = Phaser.Math.Clamp(this.page + d, 0, 1);
+    const np = Phaser.Math.Clamp(this.page + d, 0, SettingsScene.PAGES - 1);
     if (np !== this.page) {
       this.page = np;
       this.render();
@@ -94,9 +100,9 @@ export default class SettingsScene extends Phaser.Scene {
     });
   }
 
-  // ── 1페이지: 게임 모드 ──
-  private renderPage1() {
-    const s = gameState.settings;
+  // ── 1·2페이지: 잡기 설정 (일반 몬스터 / 반짝이 몬스터 — 같은 틀, 다른 저장 칸. 2026-10-10 둘로 나눔) ──
+  private renderCatchPage(c: CatchSettings, shiny: boolean) {
+    const s = c;
 
     this.group(160, 148, '과목', [
       { k: 'math', l: '수학' },
@@ -131,21 +137,35 @@ export default class SettingsScene extends Phaser.Scene {
       refresh();
     });
 
-    // 쉬운 문제 섞기 — 연산 행 오른쪽. 켜면 고른 단계보다 낮은 단계 문제가 반씩 섞인다 (2026-09-10)
-    this.text(1000, 218, '쉬운 문제 섞기', 26, 0.5);
+    // 오른쪽 열(x 880~1270): 모드 · 답하기 · 제한시간 · 쉬운 문제 섞기 — 2026-10-10 모드·답하기·제한시간을 3페이지에서 여기로(일반/반짝이 각각)
+    const side = (y: number, title: string, items: { k: string; l: string }[], get: () => string, set: (k: string) => void, btnW: number, pitch: number, x0: number, fs: number) => {
+      this.text(880, y, title, 22);
+      const btns: ButtonContainer[] = [];
+      const refresh = () => btns.forEach((b, i) => b.setBg(get() === items[i].k ? COLORS.btnGreen : COLORS.btnGray));
+      items.forEach((it, i) => {
+        btns.push(this.btn(x0 + i * pitch, y, btnW, 48, it.l, () => { set(it.k); refresh(); saveSettings(); }, { ...GLOSS3D, fontSize: fs }));
+      });
+      refresh();
+    };
+    side(160, '모드', [{ k: 'explore', l: '탐험(편하게)' }, { k: 'challenge', l: '도전(시간)' }], () => s.mode, (k) => (s.mode = k as any), 136, 144, 1016, 18);
+    side(220, '답하기', [{ k: 'choice', l: '선택' }, { k: 'input', l: '입력' }], () => s.answerMode, (k) => (s.answerMode = k as any), 136, 144, 1016, 20);
+    side(280, '제한시간', [{ k: 'easy', l: '느긋' }, { k: 'normal', l: '보통' }, { k: 'hard', l: '빠름' }], () => s.timeLevel, (k) => (s.timeLevel = k as any), 92, 98, 1026, 18);
+
+    // 쉬운 문제 섞기 — 켜면 고른 단계보다 낮은 단계 문제가 반씩 섞인다 (2026-09-10)
+    this.text(880, 340, '쉬운 문제 섞기', 22);
     let mixBtn: ButtonContainer;
     const mixRefresh = () => {
       mixBtn.setLabel(s.mixEasier ? '켜짐' : '꺼짐');
       mixBtn.setBg(s.mixEasier ? COLORS.btnGreen : COLORS.btnGray);
     };
-    mixBtn = this.btn(1000, 282, 160, 54, '', () => {
+    mixBtn = this.btn(1160, 340, 130, 48, '', () => {
       s.mixEasier = !s.mixEasier;
       mixRefresh();
       saveSettings();
-    }, { ...GLOSS3D, fontSize: 24 });
+    }, { ...GLOSS3D, fontSize: 20 });
     mixRefresh();
-    this.text(1000, 346, '켜짐: 낮은 단계도 반씩', 18, 0.5);
-    this.text(1000, 372, '꺼짐: 고른 단계만', 18, 0.5);
+    this.text(880, 392, '켜짐: 낮은 단계도 반씩 · 꺼짐: 고른 단계만', 17);
+    this.text(880, 418, '도전 모드만 제한시간을 써요', 17);
 
     this.group(160, 486, '한글 단계', [
       { k: '1', l: '글자 고르기' },
@@ -162,13 +182,19 @@ export default class SettingsScene extends Phaser.Scene {
       { k: '5', l: '5번' },
     ], () => String(s.maxMiss), (k) => (s.maxMiss = parseInt(k, 10)), { btnH: 54, fs: 24, labelFs: 28 });
 
-    this.text(DESIGN.width / 2, 608, '한글 문제는 이름을 잠깐 보여준 뒤 가려요 · 틀리면 다시 한 번 보여줘요!', 20, 0.5);
+    this.text(
+      DESIGN.width / 2,
+      608,
+      shiny
+        ? '✨ 이미 잡은 포켓몬의 스테이지를 다시 깨면 반짝이가 나와요 · 그때는 이 설정으로 문제가 나와요!'
+        : '한글 문제는 이름을 잠깐 보여준 뒤 가려요 · 틀리면 다시 한 번 보여줘요!',
+      20,
+      0.5
+    );
   }
 
-  // ── 2페이지: 소리 · 플레이 ──
-  private renderPage2() {
-    const s = gameState.settings;
-
+  // ── 3페이지: 소리 · 보호자 비밀번호 (일반·반짝이 공통. 모드·답하기·제한시간은 2026-10-10 잡기 페이지로) ──
+  private renderPage3() {
     // 소리 (한 줄 4버튼 — 누르면 바로 반영)
     this.text(160, 180, '소리', 30);
     const sopts = [
@@ -191,29 +217,13 @@ export default class SettingsScene extends Phaser.Scene {
     });
     srefresh();
 
-    this.group(160, 262, '모드', [
-      { k: 'explore', l: '탐험(편하게)' },
-      { k: 'challenge', l: '도전(시간)' },
-    ], () => s.mode, (k) => (s.mode = k as any));
-
-    this.group(160, 344, '답하기', [
-      { k: 'choice', l: '선택' },
-      { k: 'input', l: '입력' },
-    ], () => s.answerMode, (k) => (s.answerMode = k as any));
-
-    this.group(160, 426, '제한시간', [
-      { k: 'easy', l: '느긋' },
-      { k: 'normal', l: '보통' },
-      { k: 'hard', l: '빠름' },
-    ], () => s.timeLevel, (k) => (s.timeLevel = k as any));
-
     // 보호자 비밀번호 — 설정 화면 잠금(기본 0000)
-    this.text(160, 508, '보호자 비밀번호', 26);
-    this.btn(530, 508, 250, 56, '🔒 변경', () => this.changePw(), { ...GLOSS3D, bg: COLORS.btn, fontSize: 24 });
-    this.btn(810, 508, 250, 56, '↩ 0000으로', () => this.resetPw(), { ...GLOSS3D, bg: COLORS.btnGray, fontSize: 24 });
+    this.text(160, 290, '보호자 비밀번호', 30);
+    this.btn(530, 290, 250, 56, '🔒 변경', () => this.changePw(), { ...GLOSS3D, bg: COLORS.btn, fontSize: 24 });
+    this.btn(810, 290, 250, 56, '↩ 0000으로', () => this.resetPw(), { ...GLOSS3D, bg: COLORS.btnGray, fontSize: 24 });
 
     const hint = this.add
-      .text(DESIGN.width / 2, 596, '곱셈·나눗셈은 탐험 모드로\n시간 압박 없이 연습해요!', {
+      .text(DESIGN.width / 2, 440, '모드 · 답하기 · 제한시간은\n🎯 일반 · ✨ 반짝이 페이지에서 각각 정해요!\n곱셈·나눗셈은 탐험 모드로 시간 압박 없이 연습해요!', {
         fontFamily: FONT,
         fontSize: '24px',
         color: '#eaf1ff',

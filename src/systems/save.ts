@@ -1,9 +1,9 @@
 import localforage from 'localforage';
-import type { Settings } from '../types';
-import { defaultSettings } from './settings';
+import type { Settings, CatchSettings } from '../types';
+import { defaultSettings, defaultCatchSettings, bumpedCatchSettings } from './settings';
 import POKEMON_DATA from '../data/pokemon.json';
 
-const SCHEMA_VERSION = 8; // v6: 곱셈·나눗셈 프리셋 '두 자리 쉬움'을 3번에 끼움 → 그 뒤 인덱스 +1 / v7: 한글 4단계에 '두 글자 쓰기'를 끼움 → 옛 4(이름 쓰기)는 5 / v8: shiny(반짝이) 목록 추가
+const SCHEMA_VERSION = 9; // v6: 곱셈·나눗셈 프리셋 '두 자리 쉬움'을 3번에 끼움 → 그 뒤 인덱스 +1 / v7: 한글 4단계에 '두 글자 쓰기'를 끼움 → 옛 4(이름 쓰기)는 5 / v8: shiny(반짝이) 목록 추가 / v9: settings.shiny(반짝이 잡기 설정) — 없으면 일반 설정 한 단계 위로 만든다
 const KEY = 'dogyeom-save';
 const BACKUP_KEY = 'dogyeom-save-backup';
 const ADMIN_BACKUP_KEY = 'dogyeom-admin-backup'; // 관리자모드 진입 시 실제 상태 백업
@@ -73,6 +73,30 @@ export const gameState: GameState = createDefault();
 
 localforage.config({ name: 'dogyeom-game', storeName: 'save' });
 
+/** 잡기 설정(반짝이용) 한 벌을 기본값 위에 안전 복원 — 새 필드라 v6·v7 같은 인덱스 이관은 없다 (2026-10-10) */
+function sanitizeCatch(raw: any): CatchSettings {
+  const def = defaultCatchSettings();
+  const ops = {} as CatchSettings['ops'];
+  (Object.keys(def.ops) as (keyof typeof def.ops)[]).forEach((op) => {
+    const so = (raw.ops as Record<string, { enabled?: boolean; presetIndex?: number }>)?.[op] ?? {};
+    ops[op] = {
+      enabled: typeof so.enabled === 'boolean' ? so.enabled : def.ops[op].enabled,
+      presetIndex: Number.isInteger(so.presetIndex) ? (so.presetIndex as number) : 0,
+    };
+  });
+  const subj = raw.subject;
+  return {
+    ops,
+    answerMode: raw.answerMode === 'input' ? 'input' : 'choice',
+    mode: raw.mode === 'challenge' ? 'challenge' : 'explore',
+    timeLevel: raw.timeLevel === 'easy' || raw.timeLevel === 'hard' ? raw.timeLevel : 'normal',
+    maxMiss: Math.max(1, Math.min(9, Math.round(Number(raw.maxMiss) || def.maxMiss))),
+    subject: subj === 'hangul' || subj === 'mix' ? subj : 'math',
+    hangulLevel: Math.max(1, Math.min(5, Math.round(Number(raw.hangulLevel) || def.hangulLevel))),
+    mixEasier: typeof raw.mixEasier === 'boolean' ? raw.mixEasier : def.mixEasier,
+  };
+}
+
 /** 저장값을 기본값 위에 병합 + 구버전 마이그레이션 → 완성된 GameState (loadState/importSave 공용) */
 function buildMerged(saved: any): GameState {
   const merged = { ...createDefault(), ...saved } as GameState;
@@ -104,6 +128,9 @@ function buildMerged(saved: any): GameState {
   // v7: 한글 4번 자리에 '두 글자 쓰기'가 들어가 '이름 쓰기'가 4→5로 밀렸다 → 옛 저장값 보정
   if ((saved.schemaVersion || 0) < 7 && hl >= 4) hl = 5;
   merged.settings.hangulLevel = Math.max(1, Math.min(5, hl));
+  // v9: 반짝이 잡기 설정. 저장돼 있으면 같은 방식으로 보정, 없으면(옛 저장) 일반 설정 한 단계 위 — 그전 자동 상향과 같은 값이라 체감이 안 바뀐다
+  const rawShiny = saved.settings?.shiny;
+  merged.settings.shiny = rawShiny && typeof rawShiny === 'object' ? sanitizeCatch(rawShiny) : bumpedCatchSettings(merged.settings);
   if (!Array.isArray(merged.caught)) merged.caught = [];
   if (!Array.isArray(merged.caughtStages)) merged.caughtStages = [];
   if (!Array.isArray(merged.seenStory)) merged.seenStory = [];

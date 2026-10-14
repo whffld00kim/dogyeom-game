@@ -7,7 +7,7 @@ import { makeProblem } from '../systems/mathGenerator';
 import { gameState, recordStageClear, persist, bumpDailyCatch } from '../systems/save';
 import { catchSpecific, isCaught, isShiny, catchShiny, addSparkles, SHINY_GOLD_CSS, addAsh, addPokeIcon, loadPokeSprites, getName, TOTAL, REGIONS } from '../systems/dex';
 import { playCorrect, playWrong, startBattleMusic, stopBattleMusic } from '../systems/music';
-import { TIME_SECONDS, presetCount, clampPresetIndex } from '../systems/settings';
+import { TIME_SECONDS, catchSettingsOf } from '../systems/settings';
 import { isSyllable, syllableJamo, composeJamo, makeBlankProblem, makeNameOptions, keypadFor, isCho, isJung, isJongJamo, pickRandom } from '../systems/hangul';
 import type { Problem, Settings, Op } from '../types';
 
@@ -64,16 +64,10 @@ export default class GameScene extends Phaser.Scene {
     this.events.once('shutdown', stopBattleMusic); // 배틀 나가면 정지 + 합성 BGM 복원
     this.settings = gameState.settings;
     this.targetId = Phaser.Math.Clamp(this.index, 1, TOTAL);
-    // 반짝이 도전이면 설정 사본에서 켜진 연산마다 프리셋을 한 칸 올리고(끝이면 그대로), 쉬운 문제 섞기는 끈다. 한글도 한 단계 위
+    // 반짝이 도전이면 설정 화면 「반짝이 몬스터 잡기」 페이지의 설정(연산·범위·과목·한글 단계·실수 허용·섞기)으로 문제를 낸다.
+    // 2026-10-10까지는 일반 설정을 즉석에서 한 칸 올려 썼다 — 이제 사용자가 따로 정한다. 소리·모드·답하기·제한시간은 공통
     this.shinyRun = isCaught(this.targetId) && !isShiny(this.targetId);
-    if (this.shinyRun) {
-      const ops = {} as Settings['ops'];
-      (Object.keys(this.settings.ops) as Op[]).forEach((op) => {
-        const o = this.settings.ops[op];
-        ops[op] = { enabled: o.enabled, presetIndex: Math.min(presetCount(op) - 1, clampPresetIndex(op, o.presetIndex) + 1) };
-      });
-      this.settings = { ...this.settings, ops, mixEasier: false, hangulLevel: Math.min(5, this.settings.hangulLevel + 1) };
-    }
+    if (this.shinyRun) this.settings = { ...this.settings, ...catchSettingsOf(this.settings, true) };
     this.stage = makeStage(this.index, this.settings);
     this.total = this.stage.problems;
     this.solved = 0;
@@ -413,7 +407,7 @@ export default class GameScene extends Phaser.Scene {
       this.buildJamoKeypad();
     }
     this.accepting = true;
-    this.startTimer(this.hLevel >= 3 ? 2 : 1);
+    this.startTimer(); // 한글도 숫자와 같은 제한시간 (2026-10-08: 쓰기 단계 2배 배율 제거)
   }
 
   /** ① 배너: 이름에서 빈칸 자리만 주황 물음표 박스로 */

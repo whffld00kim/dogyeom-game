@@ -169,7 +169,8 @@ export default class DexScene extends Phaser.Scene {
     const mainShiny = isShinyMain(id);
     const slot = (x: number, shiny: boolean, label: string, isMain: boolean) => {
       if (isMain && two) c.add(this.add.circle(x, iy, size * 0.6, 0xfff3c4).setStrokeStyle(5, SHINY_GOLD));
-      c.add(addPokeIcon(this, x, iy, id, size, shiny));
+      // 보통 쪽은 입힌 코디가 있으면 코디 그림(칸과 같게). 반짝이는 코디 합성 그림이 없어 반짝이 색 원본 (2026-10-06 사용자 지적)
+      c.add(shiny ? addPokeIcon(this, x, iy, id, size, true) : addPokeDisplay(this, x, iy, id, size));
       if (shiny) c.add(addSparkles(this, x, iy, size, 7));
       c.add(this.add.text(x, iy + size * 0.62, label + (isMain && two ? ' · 메인' : ''), { fontFamily: FONT, fontSize: '24px', color: shiny ? SHINY_GOLD_CSS : '#3e4c70', fontStyle: 'bold', resolution: TEXT_RES }).setOrigin(0.5));
     };

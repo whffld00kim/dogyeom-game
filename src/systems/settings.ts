@@ -1,6 +1,6 @@
-import type { Settings, Op } from '../types';
+import type { Settings, CatchSettings, Op } from '../types';
 
-export function defaultSettings(): Settings {
+export function defaultCatchSettings(): CatchSettings {
   return {
     ops: {
       add: { enabled: true, presetIndex: 0 }, // 1~9
@@ -16,6 +16,30 @@ export function defaultSettings(): Settings {
     hangulLevel: 1, // 한글 단계: 글자 고르기(기본)
     mixEasier: true, // 새 단계로 올리면 그 단계만 나오는 게 너무 어려워서 기본은 섞기
   };
+}
+
+export function defaultSettings(): Settings {
+  const normal = defaultCatchSettings();
+  return {
+    ...normal,
+    shiny: bumpedCatchSettings(normal), // 반짝이 기본값 = 일반보다 한 단계 위 (설정 화면을 나누기 전의 자동 상향과 같다)
+  };
+}
+
+/** 일반 잡기 설정에서 한 단계 어려운 반짝이 설정을 만든다 — 켜진 연산마다 프리셋 한 칸 위(끝이면 그대로), 쉬운 문제 섞기 끔, 한글 한 단계 위.
+ *  2026-10-06~10-09엔 게임이 매번 이렇게 즉석 계산했고, 2026-10-10부터는 반짝이 설정이 따로 저장되므로 기본값·옛 저장 이관에만 쓴다 */
+export function bumpedCatchSettings(c: CatchSettings): CatchSettings {
+  const ops = {} as CatchSettings['ops'];
+  (Object.keys(c.ops) as Op[]).forEach((op) => {
+    const o = c.ops[op];
+    ops[op] = { enabled: o.enabled, presetIndex: Math.min(presetCount(op) - 1, clampPresetIndex(op, o.presetIndex) + 1) };
+  });
+  return { ops, answerMode: c.answerMode, mode: c.mode, timeLevel: c.timeLevel, maxMiss: c.maxMiss, subject: c.subject, hangulLevel: Math.min(5, c.hangulLevel + 1), mixEasier: false };
+}
+
+/** 이번 판에 쓸 잡기 설정 — 반짝이 도전이면 `shiny`, 아니면 일반(최상위) */
+export function catchSettingsOf(s: Settings, shiny: boolean): CatchSettings {
+  return shiny ? s.shiny : { ops: s.ops, answerMode: s.answerMode, mode: s.mode, timeLevel: s.timeLevel, maxMiss: s.maxMiss, subject: s.subject, hangulLevel: s.hangulLevel, mixEasier: s.mixEasier };
 }
 
 export const OP_LABEL: Record<Op, string> = {
@@ -89,9 +113,9 @@ export function presetLabel(op: Op, idx: number): string {
   return op === 'add' || op === 'sub' ? ADD_SUB_PRESETS[i].label : MUL_DIV_PRESETS[i].label;
 }
 
-// 도전 모드 문제당 제한시간(초)
+// 도전 모드 문제당 제한시간(초) — 수학·한글 모두 같은 값 (2026-10-08: 12/8/5 → 20/15/10, 한글 2배 배율 제거)
 export const TIME_SECONDS: Record<Settings['timeLevel'], number> = {
-  easy: 12,
-  normal: 8,
-  hard: 5,
+  easy: 20,
+  normal: 15,
+  hard: 10,
 };
