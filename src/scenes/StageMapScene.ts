@@ -173,8 +173,8 @@ export default class StageMapScene extends Phaser.Scene {
       return;
     }
     need.forEach((k) => this.load.image(k, files[k]));
+    // 파일이 없어도 로더는 끝에 complete 를 내므로 complete 만 듣는다 (loaderror 에도 걸면 첫 실패 때 그림 없이 한 번, 끝나고 또 한 번 그려졌다)
     this.load.once('complete', () => this.placeRegionsBgAndBoxes());
-    this.load.once('loaderror', () => this.placeRegionsBgAndBoxes());
     this.load.start();
   }
 

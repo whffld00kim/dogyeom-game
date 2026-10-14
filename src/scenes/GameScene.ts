@@ -141,7 +141,10 @@ export default class GameScene extends Phaser.Scene {
     // 지역 선택 화면에서 이미 받아둔 이미지(rbg{ri}) 재사용 → 없으면 새로 로드(쿼리 없이)
     const reuse = `rbg${ri}`;
     const bgKey = this.textures.exists(reuse) ? reuse : `bg_r${ri}`;
+    let started = false;
     const proceed = () => {
+      if (started) return; // 한 판에 문제 흐름은 한 번만 (두 번 시작되면 보기 타일이 겹쳐 엉뚱한 답으로 채점됐다)
+      started = true;
       this.placeRegionBg(bgKey);
       loadPokeSprites(this, [this.targetId], () => this.nextProblem());
     };
@@ -150,8 +153,10 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
     this.load.image(bgKey, regionBgPath(ri));
+    // 파일이 없어도(loaderror) 로더는 끝에 complete 를 내므로 complete 만 듣는다 — 그라데이션 폴백으로 진행.
+    // (전엔 loaderror 에도 proceed 를 걸어 배경이 없으면 두 번 시작됐고, 배경이 있으면 그 리스너가 남아
+    //  나중에 다른 그림(한글 문제의 랜덤 포켓몬 등)이 없을 때 배틀 도중 문제 흐름이 또 시작됐다)
     this.load.once('complete', proceed);
-    this.load.once('loaderror', () => proceed()); // 실패해도 진행(그라데이션 폴백)
     this.load.start();
   }
 
