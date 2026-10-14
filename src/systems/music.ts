@@ -11,7 +11,8 @@ let bgWanted = false;
 const BATTLE_URL = 'audio/battle.mp3'; // 문서 기준 상대경로(APK '/' · Pages '/repo/' 양쪽 정상 해석)
 let battleBuf: AudioBuffer | null = null;
 let battleSrc: AudioBufferSourceNode | null = null;
-let battleLoading = false;
+let battleLoading: Promise<void> | null = null; // 디코딩 중이면 그 약속(같은 파일을 두 번 받지 않고, 끝나길 기다릴 수 있게)
+let battleWanted = false; // 지금 배틀 화면인가 — 디코딩이 늦게 끝나도 배틀을 이미 나갔으면 틀지 않는다
 
 // 전체 배경음악(파일) — HTMLAudioElement → master(소리 설정 적용), 무한 루프. 배틀 중엔 일시정지.
 const BGM_URL = 'audio/bgm.mp3';
@@ -93,29 +94,36 @@ function resumeBg() {
   bgmEl.play().catch(() => {});
 }
 
-async function loadBattle() {
+/** 배틀 음악 파일을 받아 디코딩. 이미 디코딩 중이면 그 약속을 돌려준다 (전엔 바로 끝난 약속을 돌려줘 첫 배틀이 무음이 됐다) */
+function loadBattle(): Promise<void> {
   ensure();
-  if (!ctx || battleBuf || battleLoading) return;
-  battleLoading = true;
-  try {
-    const res = await fetch(BATTLE_URL);
-    const arr = await res.arrayBuffer();
-    battleBuf = await ctx.decodeAudioData(arr);
-  } catch (e) {
-    console.warn('[music] 배틀 음악 로드 실패:', e);
-  }
-  battleLoading = false;
+  if (!ctx || battleBuf) return Promise.resolve();
+  if (battleLoading) return battleLoading;
+  const ac = ctx;
+  battleLoading = (async () => {
+    try {
+      const res = await fetch(BATTLE_URL);
+      const arr = await res.arrayBuffer();
+      battleBuf = await ac.decodeAudioData(arr);
+    } catch (e) {
+      console.warn('[music] 배틀 음악 로드 실패:', e);
+    } finally {
+      battleLoading = null;
+    }
+  })();
+  return battleLoading;
 }
 
 /** 배틀 음악(파일) 무한 재생 시작. 합성 BGM은 잠시 멈춤. 반복 호출 안전. */
 export function startBattleMusic() {
   ensure();
   if (!ctx || !master) return;
+  battleWanted = true;
   if (ctx.state === 'suspended' && !appHidden) ctx.resume();
   pauseBg();
   if (battleSrc) return; // 이미 재생 중
   const begin = () => {
-    if (!ctx || !master || !battleBuf || battleSrc) return;
+    if (!battleWanted || !ctx || !master || !battleBuf || battleSrc) return; // 디코딩 중 배틀을 나갔으면 틀지 않는다(BGM 과 겹침 방지)
     const g = ctx.createGain();
     g.gain.value = 0.8; // 합성음 대비 밸런스(마스터 볼륨은 setLevel이 별도 적용)
     const src = ctx.createBufferSource();
@@ -132,6 +140,7 @@ export function startBattleMusic() {
 
 /** 배틀 음악 정지 + 합성 BGM 복원. */
 export function stopBattleMusic() {
+  battleWanted = false;
   if (battleSrc) {
     try { battleSrc.stop(); } catch { /* noop */ }
     try { battleSrc.disconnect(); } catch { /* noop */ }
