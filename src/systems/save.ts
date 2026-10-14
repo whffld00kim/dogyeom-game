@@ -269,30 +269,67 @@ function requestPersistentStorage(): void {
   }
 }
 
+// ── 저장 쓰기: 한 번에 하나씩(직렬) ──
+// 디바운스 저장·불러오기·관리자 모드 전환이 서로 끼어들면 "백업 ← 직전, 주 ← 현재" 순서가 깨질 수 있어 모두 한 줄로 세운다.
+let chain: Promise<unknown> = Promise.resolve();
+function enqueue<T>(fn: () => Promise<T>): Promise<T> {
+  const p = chain.then(fn);
+  chain = p.then(
+    () => undefined,
+    () => undefined,
+  );
+  return p;
+}
+
+/** 현재 메모리 상태를 저장소에 쓴다: 직전 저장은 백업 슬롯으로 */
+async function writeState(): Promise<void> {
+  try {
+    let prev: GameState | null = null;
+    let prevUnknown = false;
+    try {
+      prev = await localforage.getItem<GameState>(KEY);
+    } catch (e) {
+      prevUnknown = true; // 백업 회전만 건너뛰고 본 저장은 한다 (주 슬롯이 깨졌을 때 새 저장으로 살려야 하므로)
+      console.warn('[save] 직전 저장 읽기 실패(백업 회전 생략):', e);
+    }
+    if (loadFailed && (prev || prevUnknown)) {
+      console.warn('[save] 부팅 때 저장을 못 읽은 세션 — 저장된 진행을 덮어쓰지 않음');
+      return;
+    }
+    if (prev) await localforage.setItem(BACKUP_KEY, prev);
+    await localforage.setItem(KEY, gameState);
+  } catch (e) {
+    console.warn('[save] 저장 실패:', e);
+  }
+}
+
 let timer: ReturnType<typeof setTimeout> | null = null;
 /** 디바운스 저장 (잦은 호출 합치기) + 직전 백업 슬롯 유지 */
 export function persist(): void {
   if (timer) clearTimeout(timer);
-  timer = setTimeout(async () => {
-    try {
-      let prev: GameState | null = null;
-      let prevUnknown = false;
-      try {
-        prev = await localforage.getItem<GameState>(KEY);
-      } catch (e) {
-        prevUnknown = true; // 백업 회전만 건너뛰고 본 저장은 한다 (주 슬롯이 깨졌을 때 새 저장으로 살려야 하므로)
-        console.warn('[save] 직전 저장 읽기 실패(백업 회전 생략):', e);
-      }
-      if (loadFailed && (prev || prevUnknown)) {
-        console.warn('[save] 부팅 때 저장을 못 읽은 세션 — 저장된 진행을 덮어쓰지 않음');
-        return;
-      }
-      if (prev) await localforage.setItem(BACKUP_KEY, prev);
-      await localforage.setItem(KEY, gameState);
-    } catch (e) {
-      console.warn('[save] 저장 실패:', e);
-    }
+  timer = setTimeout(() => {
+    timer = null;
+    void enqueue(writeState);
   }, 300);
+}
+
+/** 대기 중인 디바운스 저장을 지금 바로 쓴다(없으면 진행 중인 쓰기만 기다림). 홈 버튼·앱 전환 직후 앱이 죽어도 마지막 진행이 남게 */
+export function flushPersist(): Promise<void> {
+  if (!timer) return chain.then(() => undefined);
+  clearTimeout(timer);
+  timer = null;
+  return enqueue(writeState);
+}
+
+/** 화면이 가려질 때(홈 버튼·앱 전환·탭 숨김·페이지 종료) 대기 중인 저장을 바로 쓰도록 연결 */
+export function installBackgroundFlush(
+  win: { addEventListener(type: string, cb: () => void): void },
+  doc: { addEventListener(type: string, cb: () => void): void; hidden?: boolean },
+): void {
+  doc.addEventListener('visibilitychange', () => {
+    if (doc.hidden) void flushPersist();
+  });
+  win.addEventListener('pagehide', () => void flushPersist());
 }
 
 /** 스테이지 클리어 기록: 별 갱신(최고치), 다음 스테이지 해금, 코인 지급 */
@@ -382,25 +419,27 @@ export async function importSave(code: string): Promise<{ ok: boolean; msg: stri
   if (!isPlainObject(saved) || (!Array.isArray(saved.caught) && typeof saved.coins !== 'number')) {
     return { ok: false, msg: '백업 데이터가 아니에요.' };
   }
-  try {
-    if (timer) {
-      clearTimeout(timer); // 대기 중인 디바운스 저장 취소(레이스 방지)
-      timer = null;
-    }
-    Object.assign(gameState, buildMerged(saved));
-    let prev: GameState | null = null;
+  return enqueue(async () => {
     try {
-      prev = await localforage.getItem<GameState>(KEY);
-    } catch (e) {
-      console.warn('[save] 직전 저장 읽기 실패(백업 회전 생략):', e);
+      if (timer) {
+        clearTimeout(timer); // 대기 중인 디바운스 저장 취소(레이스 방지)
+        timer = null;
+      }
+      Object.assign(gameState, buildMerged(saved));
+      let prev: GameState | null = null;
+      try {
+        prev = await localforage.getItem<GameState>(KEY);
+      } catch (e) {
+        console.warn('[save] 직전 저장 읽기 실패(백업 회전 생략):', e);
+      }
+      if (prev) await localforage.setItem(BACKUP_KEY, prev); // 직전 상태는 백업 슬롯에 보존
+      await localforage.setItem(KEY, gameState); // 즉시 저장(디바운스 X)
+      loadFailed = false; // 보호자가 직접 고른 데이터가 이제 기준
+      return { ok: true, msg: '불러오기 완료!' };
+    } catch {
+      return { ok: false, msg: '저장에 실패했어요.' };
     }
-    if (prev) await localforage.setItem(BACKUP_KEY, prev); // 직전 상태는 백업 슬롯에 보존
-    await localforage.setItem(KEY, gameState); // 즉시 저장(디바운스 X)
-    loadFailed = false; // 보호자가 직접 고른 데이터가 이제 기준
-    return { ok: true, msg: '불러오기 완료!' };
-  } catch {
-    return { ok: false, msg: '저장에 실패했어요.' };
-  }
+  });
 }
 
 // ── 관리자(검증) 모드 ─────────────────────────────────────────────
@@ -411,30 +450,69 @@ export function isAdmin(): boolean {
   return !!gameState.adminMode;
 }
 
-export async function enterAdmin(): Promise<void> {
-  if (gameState.adminMode) return;
-  const snapshot = JSON.parse(JSON.stringify(gameState)); // 실제 상태 깊은 복제
-  snapshot.adminMode = false;
-  gameState.adminMode = true;
-  gameState.coins = 99999;
-  gameState.caught = Array.from({ length: POKE_TOTAL }, (_, i) => i + 1);
-  gameState.maxUnlocked = POKE_TOTAL;
-  if (timer) {
-    clearTimeout(timer); // 대기중 디바운스 저장 취소(레이스 방지)
-    timer = null;
-  }
-  await localforage.setItem(ADMIN_BACKUP_KEY, snapshot);
-  await localforage.setItem(KEY, gameState);
+/** 관리자 모드 ON. 켰으면(또는 이미 켜져 있으면) true, 저장을 못 읽은 세션이거나 백업 저장에 실패하면 아무것도 바꾸지 않고 false */
+export function enterAdmin(): Promise<boolean> {
+  return enqueue(async () => {
+    if (gameState.adminMode) return true;
+    try {
+      if (loadFailed) {
+        // 부팅 때 저장을 못 읽었으면 지금 메모리는 기본값 — 이걸 "실제 상태"로 백업하면 끌 때 진짜 진행이 사라진다
+        let cur: unknown = null;
+        let unknown = false;
+        try {
+          cur = await localforage.getItem(KEY);
+        } catch {
+          unknown = true;
+        }
+        if (cur || unknown) return false;
+      }
+      const snapshot = JSON.parse(JSON.stringify(gameState)); // 실제 상태 깊은 복제
+      snapshot.adminMode = false;
+      await localforage.setItem(ADMIN_BACKUP_KEY, snapshot); // 실제 상태를 먼저 안전하게 보관한 뒤에만 바꾼다
+      gameState.adminMode = true;
+      gameState.coins = 99999;
+      gameState.caught = Array.from({ length: POKE_TOTAL }, (_, i) => i + 1);
+      gameState.maxUnlocked = POKE_TOTAL;
+      if (timer) {
+        clearTimeout(timer); // 대기중 디바운스 저장 취소(레이스 방지)
+        timer = null;
+      }
+      await localforage.setItem(KEY, gameState);
+      return true;
+    } catch (e) {
+      console.warn('[save] 관리자 모드 켜기 실패:', e);
+      return false;
+    }
+  });
 }
 
-export async function exitAdmin(): Promise<void> {
-  const backup = await localforage.getItem<GameState>(ADMIN_BACKUP_KEY);
-  if (backup) Object.assign(gameState, buildMerged(backup)); // 실제 상태 복원
-  gameState.adminMode = false;
-  if (timer) {
-    clearTimeout(timer);
-    timer = null;
-  }
-  await localforage.removeItem(ADMIN_BACKUP_KEY);
-  await localforage.setItem(KEY, gameState);
+/** 관리자 모드 OFF: 백업해 둔 실제 상태로 복원. 백업을 읽지 못하면 아무것도 바꾸지 않고 false */
+export function exitAdmin(): Promise<boolean> {
+  return enqueue(async () => {
+    let backup: GameState | null;
+    try {
+      backup = await localforage.getItem<GameState>(ADMIN_BACKUP_KEY);
+    } catch (e) {
+      console.warn('[save] 관리자 백업 읽기 실패:', e);
+      return false;
+    }
+    if (backup) Object.assign(gameState, buildMerged(backup)); // 실제 상태 복원
+    gameState.adminMode = false;
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    try {
+      await localforage.setItem(KEY, gameState); // 실제 상태를 먼저 저장하고
+    } catch (e) {
+      console.warn('[save] 관리자 모드 끄기 저장 실패:', e);
+      return false;
+    }
+    try {
+      await localforage.removeItem(ADMIN_BACKUP_KEY); // 그 다음에 백업을 지운다 — 그 사이 앱이 꺼져도 진행이 남는다
+    } catch (e) {
+      console.warn('[save] 관리자 백업 정리 실패(다음 진입 때 덮어씀):', e);
+    }
+    return true;
+  });
 }

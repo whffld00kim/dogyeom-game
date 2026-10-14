@@ -258,15 +258,15 @@ export default class SettingsScene extends Phaser.Scene {
     };
     adminBtn = this.btn(900, by, 200, 60, '', () => {
       if (isAdmin()) {
-        exitAdmin().then(() => {
+        exitAdmin().then((ok) => {
           refreshAdmin();
-          window.alert('관리자모드 OFF — 원래 저장 상태로 돌아왔어요.');
+          window.alert(ok ? '관리자모드 OFF — 원래 저장 상태로 돌아왔어요.' : '저장소를 읽지 못해 관리자모드를 끄지 못했어요. 다시 시도해 주세요.');
         });
       } else {
         if (!window.confirm('관리자(검증) 모드를 켤까요?\n코인 99999 + 모든 포켓몬 포획 상태가 됩니다.\n끄면 지금 상태로 복구돼요(검증 중 변경사항은 사라짐).')) return;
-        enterAdmin().then(() => {
+        enterAdmin().then((ok) => {
           refreshAdmin();
-          window.alert('관리자모드 ON — 코인 99999, 모든 포켓몬 포획!');
+          window.alert(ok ? '관리자모드 ON — 코인 99999, 모든 포켓몬 포획!' : '저장 데이터를 읽지 못한 상태라 관리자모드를 켤 수 없어요. 앱을 완전히 껐다가 다시 켜 주세요.');
         });
       }
     }, { ...GLOSS3D, fontSize: 24 });
