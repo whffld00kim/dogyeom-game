@@ -118,6 +118,30 @@ export function makeProblem(s: Settings, rng: () => number = Math.random): Probl
   return { op, a, b, answer, text, choices };
 }
 
+/**
+ * 한 판 안에서 같은 식이 다시 나오지 않게 문제를 고른다 (2026-10-15 사용자 요청).
+ * 전엔 문제마다 따로 뽑아 덧셈 1~9에서 한 판의 32%가 같은 문제를 연달아 냈다("1 + 1" 두 번).
+ * 출제 방식(범위·쉬운 문제 섞기·연산 비율)은 그대로 두고, 이미 낸 식이면 다시 뽑을 뿐이다.
+ * 고를 수 있는 식이 적은 설정(예: 한 단만)은 다 쓰면 겹칠 수 있지만, 그때도 바로 앞 문제와는 다르게 한다.
+ */
+export function makeFreshProblem(
+  s: Settings,
+  used: ReadonlySet<string>,
+  prevText: string | null,
+  rng: () => number = Math.random,
+  tries = 40,
+): Problem {
+  let fallback: Problem | null = null;
+  let p = makeProblem(s, rng);
+  for (let i = 0; i < tries; i++) {
+    if (!used.has(p.text)) return p;
+    if (!fallback && p.text !== prevText) fallback = p;
+    p = makeProblem(s, rng);
+  }
+  if (!used.has(p.text)) return p;
+  return fallback ?? p;
+}
+
 /** 정답 + 그럴듯한 오답 3개 (자릿수 바꿈/근접값/흔한 실수). 모두 정수·0이상·유일. */
 function makeChoices(answer: number, op: Op, a: number, b: number, rng: () => number): number[] {
   const set = new Set<number>([answer]);

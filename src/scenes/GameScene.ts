@@ -3,7 +3,7 @@ import { DESIGN, FONT, COLORS, GROUND_Y, TEXT_RES, regionBgPath } from '../theme
 import { drawBackground, makeButton, addCoinHud, toast, applyHiRes } from '../widgets';
 import { makeStage, stageReward, BIOME_COLORS } from '../systems/stageGenerator';
 import type { Stage } from '../systems/stageGenerator';
-import { makeProblem } from '../systems/mathGenerator';
+import { makeFreshProblem } from '../systems/mathGenerator';
 import { gameState, recordStageClear, persist, bumpDailyCatch } from '../systems/save';
 import { catchSpecific, isCaught, isShiny, catchShiny, addSparkles, SHINY_GOLD_CSS, addAsh, addPokeIcon, loadPokeSprites, getName, TOTAL, REGIONS } from '../systems/dex';
 import { playCorrect, playWrong, startBattleMusic, stopBattleMusic } from '../systems/music';
@@ -20,6 +20,7 @@ export default class GameScene extends Phaser.Scene {
   private mistakes = 0;
   private bonusLost = false;
   private current!: Problem;
+  private usedTexts = new Set<string>(); // 이 판에 이미 낸 수학 식 — 같은 문제 반복 방지
   private accepting = false;
   private inputValue = '';
 
@@ -71,6 +72,7 @@ export default class GameScene extends Phaser.Scene {
     this.stage = makeStage(this.index, this.settings);
     this.total = this.stage.problems;
     this.solved = 0;
+    this.usedTexts = new Set();
     this.mistakes = 0;
     this.bonusLost = false;
     this.accepting = false;
@@ -226,7 +228,8 @@ export default class GameScene extends Phaser.Scene {
 
   /** 수학 문제 출제(기존 경로) */
   private showMathProblem() {
-    this.current = makeProblem(this.settings);
+    this.current = makeFreshProblem(this.settings, this.usedTexts, this.current?.text ?? null);
+    this.usedTexts.add(this.current.text);
     this.bannerText.setFontSize(52).setText(`${this.current.text} = ?`);
     if (this.settings.answerMode === 'input') this.showInput();
     else this.showChoices();
