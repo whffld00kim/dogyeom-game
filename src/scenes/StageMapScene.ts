@@ -3,7 +3,7 @@ import { DESIGN, FONT, COLORS, TEXT_RES, regionBgPath } from '../theme';
 import { drawBackground, makeButton, drawStars, applyHiRes, gateSettings, GLOSS3D } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
 import { gameState } from '../systems/save';
-import { REGIONS, isCaught, isShiny, loadPokeSprites, addPokeIcon, SHINY_GOLD } from '../systems/dex';
+import { REGIONS, isCaught, isShiny, loadPokeSprites, addPokeIcon, SHINY_GOLD, pokeKeepKeys } from '../systems/dex';
 import type { Region } from '../systems/dex';
 import { regionIntro } from '../systems/story';
 
@@ -303,7 +303,7 @@ export default class StageMapScene extends Phaser.Scene {
 
   /** 현재 페이지에 필요 없는 poke_ 텍스처 해제 (메모리 누적 방지, 필요 시 자동 재로드) */
   private freePokeExcept(keepIds: number[]) {
-    const keep = new Set(keepIds.map((id) => `poke_${id}`));
+    const keep = pokeKeepKeys(keepIds); // 반짝이 그림도 남긴다
     this.textures.getTextureKeys().forEach((k) => {
       if (k.startsWith('poke_') && !keep.has(k)) this.textures.remove(k);
     });

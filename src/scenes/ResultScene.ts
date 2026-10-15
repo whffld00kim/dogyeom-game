@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DESIGN, FONT, COLORS, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, drawStars, applyHiRes } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
-import { getName, loadPokeSprites, addPokeIcon, addSparkles, SHINY_GOLD, SHINY_GOLD_CSS } from '../systems/dex';
+import { TOTAL, getName, loadPokeSprites, addPokeIcon, addSparkles, SHINY_GOLD, SHINY_GOLD_CSS } from '../systems/dex';
 import { playCatch } from '../systems/music';
 import { gameState, todayKey } from '../systems/save';
 
@@ -148,7 +148,12 @@ export default class ResultScene extends Phaser.Scene {
     const by = py + ph / 2 - 56;
     makeButton(this, px - 185, by, 160, 72, '↻ 다시', () => this.scene.start('Game', { index }), { bg: COLORS.btnGray, fontSize: 30 });
     makeButton(this, px, by, 160, 72, '🗺 맵', () => this.scene.start('StageMap'), { fontSize: 30 });
-    makeButton(this, px + 185, by, 160, 72, '다음 ▶', () => this.scene.start('Game', { index: index + 1 }), { bg: COLORS.btnGreen, fontSize: 30 });
+    if (index < TOTAL) {
+      makeButton(this, px + 185, by, 160, 72, '다음 ▶', () => this.scene.start('Game', { index: index + 1 }), { bg: COLORS.btnGreen, fontSize: 30 });
+    } else {
+      // 마지막 스테이지(1025): 다음 스테이지가 없으니 도감으로 (2026-10-15)
+      makeButton(this, px + 185, by, 160, 72, '📕 도감', () => this.scene.start('Dex'), { bg: COLORS.btnGreen, fontSize: 30 });
+    }
   }
 
   /** 하드웨어 백버튼 → 스테이지 선택으로 */

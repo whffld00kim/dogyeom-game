@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DESIGN, FONT, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, applyHiRes, ButtonContainer, glassSlot, toast } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
-import { getName, REGIONS, loadPokeSprites, isCaught, isShiny, isShinyMain, toggleShinyMain, addPokeIcon, addSparkles, SHINY_GOLD, SHINY_GOLD_CSS } from '../systems/dex';
+import { getName, REGIONS, loadPokeSprites, pokeKeepKeys, isCaught, isShiny, isShinyMain, toggleShinyMain, addPokeIcon, addSparkles, SHINY_GOLD, SHINY_GOLD_CSS } from '../systems/dex';
 import type { Region } from '../systems/dex';
 import { addPokeDisplay, loadOutfitTextures, equippedOutfit } from '../systems/outfits';
 import { gameState } from '../systems/save';
@@ -290,7 +290,7 @@ export default class DexScene extends Phaser.Scene {
 
   /** 현재 페이지에 필요 없는 poke_/outfit_ 텍스처를 해제해 메모리 누적 방지 (필요 시 자동 재로드) */
   private freeTexturesExcept(keepIds: number[]) {
-    const keepPoke = new Set(keepIds.map((id) => `poke_${id}`));
+    const keepPoke = pokeKeepKeys(keepIds); // 반짝이 그림도 남긴다
     const keepOutfit = new Set(
       (keepIds.map((id) => equippedOutfit(id)).filter(Boolean) as string[]).map((oid) => `outfit_${oid}`),
     );

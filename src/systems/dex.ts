@@ -210,6 +210,16 @@ export function catchShiny(id: number): number | null {
 export function shinyKey(id: number): string {
   return `poke_shiny_${id}`;
 }
+/** 텍스처 해제 때 남길 키: 보통 그림 + 그 포켓몬의 반짝이 그림.
+ *  반짝이도 `poke_` 로 시작해 전엔 지금 화면의 반짝이까지 지웠다 → 톡·넘김마다 색 변환을 다시 했다 (2026-10-15) */
+export function pokeKeepKeys(ids: number[]): Set<string> {
+  const keep = new Set<string>();
+  ids.forEach((id) => {
+    keep.add(pokeKey(id));
+    keep.add(shinyKey(id));
+  });
+  return keep;
+}
 /** 도감 메인 그림이 반짝이인지(반짝이를 잡은 것만 의미 있음) */
 export function isShinyMain(id: number): boolean {
   return isShiny(id) && gameState.shinyMain.includes(id);

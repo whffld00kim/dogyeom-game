@@ -326,6 +326,10 @@ export default class SettingsScene extends Phaser.Scene {
 
   /** 현재 진행 상황 → 백업 코드. 클립보드 복사 + 입력창에 표시(직접 복사용) */
   private doBackup() {
+    if (isAdmin()) {
+      window.alert('관리자 모드 중에는 백업할 수 없어요.\n지금은 코인·도감이 확인용 상태라, 이걸 백업하면 진짜 기록 대신 저장돼요.\n관리자 모드를 끈 뒤에 다시 눌러 주세요.');
+      return;
+    }
     let code = '';
     try {
       code = exportSave();

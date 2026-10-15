@@ -391,7 +391,9 @@ function b64ToUtf8(b: string): string {
 }
 
 /** 현재 진행 상태 → 백업 코드 문자열 (카톡·메모에 보관용) */
+/** 관리자 모드 중에는 빈 문자열 — 그때 상태(코인 99999·전 포획)는 가짜라, 그 코드로 복구하면 실제 진행이 사라진다 (2026-10-15) */
 export function exportSave(): string {
+  if (gameState.adminMode) return '';
   return CODE_PREFIX + utf8ToB64(JSON.stringify(gameState));
 }
 

@@ -5,7 +5,7 @@ import { makeStage, stageReward, BIOME_COLORS } from '../systems/stageGenerator'
 import type { Stage } from '../systems/stageGenerator';
 import { makeFreshProblem } from '../systems/mathGenerator';
 import { gameState, recordStageClear, persist, bumpDailyCatch } from '../systems/save';
-import { catchSpecific, isCaught, isShiny, catchShiny, addSparkles, SHINY_GOLD_CSS, addAsh, addPokeIcon, loadPokeSprites, getName, TOTAL, REGIONS } from '../systems/dex';
+import { catchSpecific, isCaught, isShiny, catchShiny, addSparkles, SHINY_GOLD_CSS, addAsh, addPokeIcon, loadPokeSprites, getName, TOTAL, REGIONS, pokeKeepKeys } from '../systems/dex';
 import { playCorrect, playWrong, startBattleMusic, stopBattleMusic } from '../systems/music';
 import { TIME_SECONDS, catchSettingsOf } from '../systems/settings';
 import { isSyllable, syllableJamo, composeJamo, makeBlankProblem, makeNameOptions, keypadFor, isCho, isJung, isJongJamo, pickRandom } from '../systems/hangul';
@@ -56,7 +56,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   init(data: { index?: number }) {
-    this.index = data.index ?? 1;
+    // 스테이지는 1~1025(포켓몬 수). 전엔 마지막 스테이지 결과의 '다음'이 1026을 열어 "스테이지 1026"으로 1025를 다시 했다
+    this.index = Phaser.Math.Clamp(Math.round(data.index ?? 1), 1, TOTAL);
   }
 
   create() {
@@ -128,9 +129,9 @@ export default class GameScene extends Phaser.Scene {
     this.answerLayer = this.add.container(0, 0);
 
     // 메모리: 이전 배틀의 랜덤 포켓몬 텍스처 해제(연속 배틀 누적 방지 — 필요 시 자동 재로드)
-    const keep = `poke_${this.targetId}`;
+    const keep = pokeKeepKeys([this.targetId]); // 반짝이 도전이면 그 반짝이 그림도 남긴다
     this.textures.getTextureKeys().forEach((k) => {
-      if (k.startsWith('poke_') && k !== keep) this.textures.remove(k);
+      if (k.startsWith('poke_') && !keep.has(k)) this.textures.remove(k);
     });
 
     // 지역 배경 이미지 로드 → 적 스프라이트 로드 → 첫 문제 시작
