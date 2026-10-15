@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { DESIGN, FONT, TEXT_RES } from '../theme';
 import { drawBackground, makeButton, addCoinHud, applyHiRes, ButtonContainer, glassSlot, toast } from '../widgets';
 import { BIOME_COLORS } from '../systems/stageGenerator';
-import { getName, REGIONS, loadPokeSprites, isCaught, isShiny, isShinyMain, toggleShinyMain, addPokeIcon, addSparkles, SHINY_GOLD, SHINY_GOLD_CSS } from '../systems/dex';
+import { getName, REGIONS, loadPokeSprites, pokeKeepKeys, isCaught, isShiny, isShinyMain, toggleShinyMain, addPokeIcon, addSparkles, SHINY_GOLD, SHINY_GOLD_CSS } from '../systems/dex';
 import type { Region } from '../systems/dex';
 import { addPokeDisplay, loadOutfitTextures, equippedOutfit } from '../systems/outfits';
 import { gameState } from '../systems/save';
@@ -28,6 +28,7 @@ export default class DexScene extends Phaser.Scene {
   private longTimer?: Phaser.Time.TimerEvent;
   private longFired = false;
   private pageIds: number[] = []; // 지금 페이지의 포켓몬 id(히트테스트용)
+  private renderSeq = 0; // renderPage 호출 번호 — 늦게 끝난 앞 페이지의 로드 콜백을 버리기 위해
   private popup?: Phaser.GameObjects.Container; // 꾹 누르기 큰 그림 팝업
 
   constructor() {
@@ -276,12 +277,20 @@ export default class DexScene extends Phaser.Scene {
     // 잡은 포켓몬만 스프라이트/코디 로드(못 잡은 건 ❓ 카드라 로드 불필요 → 메모리 절약)
     const caughtIds = ids.filter((id) => isCaught(id));
     const oids = caughtIds.map((id) => equippedOutfit(id)).filter(Boolean) as string[];
-    loadPokeSprites(this, caughtIds, () => loadOutfitTextures(this, oids, () => this.drawGrid(ids, pages)));
+    // 로드가 끝나기 전에 다른 페이지·지역으로 넘어갔으면 이 콜백은 버린다 (안 그러면 앞 페이지가 지금 페이지 위에 겹쳐 그려졌다)
+    const seq = ++this.renderSeq;
+    const stillMine = () => seq === this.renderSeq && this.contentLayer.active;
+    loadPokeSprites(this, caughtIds, () => {
+      if (!stillMine()) return;
+      loadOutfitTextures(this, oids, () => {
+        if (stillMine()) this.drawGrid(ids, pages);
+      });
+    });
   }
 
   /** 현재 페이지에 필요 없는 poke_/outfit_ 텍스처를 해제해 메모리 누적 방지 (필요 시 자동 재로드) */
   private freeTexturesExcept(keepIds: number[]) {
-    const keepPoke = new Set(keepIds.map((id) => `poke_${id}`));
+    const keepPoke = pokeKeepKeys(keepIds); // 반짝이 그림도 남긴다
     const keepOutfit = new Set(
       (keepIds.map((id) => equippedOutfit(id)).filter(Boolean) as string[]).map((oid) => `outfit_${oid}`),
     );

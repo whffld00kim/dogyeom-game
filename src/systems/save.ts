@@ -73,8 +73,68 @@ export const gameState: GameState = createDefault();
 
 localforage.config({ name: 'dogyeom-game', storeName: 'save' });
 
-/** 잡기 설정(반짝이용) 한 벌을 기본값 위에 안전 복원 — 새 필드라 v6·v7 같은 인덱스 이관은 없다 (2026-10-10) */
-function sanitizeCatch(raw: any): CatchSettings {
+// ── 값 보정 도우미 (옛 저장·외부 백업 코드의 틀린 타입·범위 밖 값에도 앱이 멈추지 않게) ──
+// 저장 데이터의 모양(필드 이름·의미)은 그대로이고, 값만 안전한 범위로 고친다.
+function numOf(v: unknown): number | null {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v;
+  return typeof n === 'number' && Number.isFinite(n) ? n : null;
+}
+/** 정수(없거나 이상하면 def), min~max 로 자른다 */
+function intOr(v: unknown, def: number, min: number, max: number): number {
+  const n = numOf(v);
+  if (n === null) return def;
+  return Math.max(min, Math.min(max, Math.round(n)));
+}
+/** 정수 목록: 범위 안의 정수만, 중복 없이, 순서 유지 */
+function intList(v: unknown, min: number, max: number): number[] {
+  if (!Array.isArray(v)) return [];
+  const out: number[] = [];
+  v.forEach((x) => {
+    if (typeof x === 'number' && Number.isInteger(x) && x >= min && x <= max && !out.includes(x)) out.push(x);
+  });
+  return out;
+}
+function strList(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+}
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+/** 포켓몬 id → 코디 id. 키는 양의 정수 문자열, 값은 문자열만 */
+function outfitMap(v: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!isPlainObject(v)) return out;
+  Object.entries(v).forEach(([k, val]) => {
+    if (/^\d+$/.test(k) && typeof val === 'string') out[k] = val;
+  });
+  return out;
+}
+/** 스테이지 별: 키는 양의 정수, 값은 1~3 (0 이하·이상값은 "안 깸"으로 버림) */
+function starsMap(v: unknown): Record<number, number> {
+  const out: Record<number, number> = {};
+  if (!isPlainObject(v)) return out;
+  Object.entries(v).forEach(([k, val]) => {
+    const n = Number(k);
+    const s = numOf(val);
+    if (Number.isInteger(n) && n >= 1 && s !== null && Math.round(s) >= 1) out[n] = Math.min(3, Math.round(s));
+  });
+  return out;
+}
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** 날짜별 포획 수: 'YYYY-MM-DD' 키와 0 이상 정수 값만 (문자열 숫자는 숫자로) */
+function dailyMap(v: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!isPlainObject(v)) return out;
+  Object.entries(v).forEach(([k, val]) => {
+    const n = numOf(val);
+    if (DATE_KEY_RE.test(k) && n !== null && n >= 0) out[k] = Math.round(n);
+  });
+  return out;
+}
+
+/** 잡기 설정 한 벌을 기본값 위에 안전 복원 — 일반(최상위)·반짝이(settings.shiny) 공용. 인덱스 이관은 buildMerged 에서 */
+function sanitizeCatch(rawIn: unknown): CatchSettings {
+  const raw = isPlainObject(rawIn) ? rawIn : {};
   const def = defaultCatchSettings();
   const ops = {} as CatchSettings['ops'];
   (Object.keys(def.ops) as (keyof typeof def.ops)[]).forEach((op) => {
@@ -99,71 +159,95 @@ function sanitizeCatch(raw: any): CatchSettings {
 
 /** 저장값을 기본값 위에 병합 + 구버전 마이그레이션 → 완성된 GameState (loadState/importSave 공용) */
 function buildMerged(saved: any): GameState {
+  const ver = Number(saved.schemaVersion) || 0;
   const merged = { ...createDefault(), ...saved } as GameState;
-  merged.settings = { ...defaultSettings(), ...(saved.settings || {}) };
-  // ops: 기본값 기준으로 enabled / presetIndex 만 안전 복원 (구버전 min/max 는 무시)
-  const defOps = defaultSettings().ops;
-  const ops = {} as typeof defOps;
-  (Object.keys(defOps) as (keyof typeof defOps)[]).forEach((op) => {
-    const so = (saved.settings?.ops as Record<string, { enabled?: boolean; presetIndex?: number }>)?.[op] ?? {};
-    ops[op] = {
-      enabled: typeof so.enabled === 'boolean' ? so.enabled : defOps[op].enabled,
-      presetIndex: Number.isInteger(so.presetIndex) ? (so.presetIndex as number) : 0,
-    };
-  });
+  const rawSettings: Record<string, unknown> = isPlainObject(saved.settings) ? saved.settings : {};
+  // 일반 잡기 설정: ops 는 기본값 기준으로 enabled / presetIndex 만 안전 복원 (구버전 min/max 는 무시), 모드·답하기·제한시간도 보정
+  const top = sanitizeCatch(rawSettings);
   // v6: MUL_DIV_PRESETS 3번 자리에 '두 자리 쉬움'이 들어가 1~100(3)·1~1000(4)이 한 칸 밀렸다 → 저장값 보정
-  if ((saved.schemaVersion || 0) < 6) {
+  if (ver < 6) {
     (['mul', 'div'] as const).forEach((op) => {
-      if (ops[op].presetIndex >= 3) ops[op].presetIndex += 1;
+      if (top.ops[op].presetIndex >= 3) top.ops[op].presetIndex += 1;
     });
   }
-  merged.settings.ops = ops;
-  merged.settings.mixEasier = typeof merged.settings.mixEasier === 'boolean' ? merged.settings.mixEasier : true;
-  // 실수 허용 횟수: 구세이브/외부 코드에서 이상값이면 기본 2로, 1~9 범위로 보정
-  merged.settings.maxMiss = Math.max(1, Math.min(9, Math.round(Number(merged.settings.maxMiss) || 2)));
-  // 과목/한글 단계: 구세이브·외부 코드 이상값 보정
-  const subj = merged.settings.subject;
-  merged.settings.subject = subj === 'hangul' || subj === 'mix' ? subj : 'math';
-  let hl = Math.round(Number(merged.settings.hangulLevel) || 1);
   // v7: 한글 4번 자리에 '두 글자 쓰기'가 들어가 '이름 쓰기'가 4→5로 밀렸다 → 옛 저장값 보정
-  if ((saved.schemaVersion || 0) < 7 && hl >= 4) hl = 5;
-  merged.settings.hangulLevel = Math.max(1, Math.min(5, hl));
+  if (ver < 7 && top.hangulLevel >= 4) top.hangulLevel = 5;
   // v9: 반짝이 잡기 설정. 저장돼 있으면 같은 방식으로 보정, 없으면(옛 저장) 일반 설정 한 단계 위 — 그전 자동 상향과 같은 값이라 체감이 안 바뀐다
-  const rawShiny = saved.settings?.shiny;
-  merged.settings.shiny = rawShiny && typeof rawShiny === 'object' ? sanitizeCatch(rawShiny) : bumpedCatchSettings(merged.settings);
-  if (!Array.isArray(merged.caught)) merged.caught = [];
-  if (!Array.isArray(merged.caughtStages)) merged.caughtStages = [];
-  if (!Array.isArray(merged.seenStory)) merged.seenStory = [];
-  if (!Array.isArray(merged.ownedItems)) merged.ownedItems = [];
-  if (!merged.equipped || typeof merged.equipped !== 'object') merged.equipped = {};
-  if (!merged.dailyCatch || typeof merged.dailyCatch !== 'object' || Array.isArray(merged.dailyCatch)) merged.dailyCatch = {};
-  if (!Array.isArray(merged.shiny)) merged.shiny = []; // v8 이전 저장엔 없음
-  if (!Array.isArray(merged.shinyMain)) merged.shinyMain = [];
+  const rawShiny = rawSettings.shiny;
+  merged.settings = { ...top, shiny: isPlainObject(rawShiny) ? sanitizeCatch(rawShiny) : bumpedCatchSettings(top) };
+
+  merged.coins = Math.max(0, Math.floor(numOf(saved.coins) ?? 0)); // 음수·문자열·NaN 코인 금지 (숫자 더하기가 문자열 붙이기가 되지 않게)
+  merged.stageStars = starsMap(saved.stageStars);
+  merged.maxUnlocked = intOr(saved.maxUnlocked, 1, 1, Number.MAX_SAFE_INTEGER);
+  merged.caught = intList(saved.caught, 1, POKE_TOTAL);
+  merged.caughtStages = intList(saved.caughtStages, 1, Number.MAX_SAFE_INTEGER);
+  merged.seenStory = strList(saved.seenStory);
+  merged.ownedItems = strList(saved.ownedItems);
+  merged.equipped = isPlainObject(saved.equipped) ? (saved.equipped as GameState['equipped']) : {};
+  merged.dailyCatch = dailyMap(saved.dailyCatch);
+  merged.shiny = intList(saved.shiny, 1, POKE_TOTAL); // v8 이전 저장엔 없음
+  merged.shinyMain = intList(saved.shinyMain, 1, POKE_TOTAL);
   // 구버전(지우 단일 꾸미기: 슬롯→아이템 평면 구조) 감지 → 포켓몬별 구조로 리셋
   if (Object.values(merged.equipped).some((v) => typeof v === 'string')) merged.equipped = {};
   // v4: 꾸미기 아이템 id 형식 변경(이모지→벡터, 슬롯 6개) → 구버전 꾸미기만 1회 초기화 (코인·도감·별은 유지)
-  if ((saved.schemaVersion || 0) < 4) {
+  if (ver < 4) {
     merged.ownedItems = [];
     merged.equipped = {};
   }
-  if (!merged.outfit || typeof merged.outfit !== 'object' || Array.isArray(merged.outfit)) merged.outfit = {};
-  if (!Array.isArray(merged.ownedOutfits)) merged.ownedOutfits = [];
-  if (typeof merged.soundLevel !== 'number') merged.soundLevel = 2;
+  merged.outfit = outfitMap(saved.outfit);
+  merged.ownedOutfits = strList(saved.ownedOutfits);
+  merged.soundLevel = intOr(saved.soundLevel, 2, 0, 3);
+  merged.adminMode = saved.adminMode === true;
   merged.schemaVersion = SCHEMA_VERSION;
   return merged;
 }
 
-/** 부팅 시 1회: 저장된 상태를 메모리로 불러와 병합 */
+/** 저장 슬롯에 든 값이 우리 저장 데이터인가 */
+function isSaveLike(v: unknown): v is GameState {
+  return isPlainObject(v) && !!v.schemaVersion;
+}
+
+// 부팅 때 저장소(주 슬롯·백업 슬롯 모두)를 읽지 못해 기본값으로 시작했으면 true.
+// 이 동안은 persist 가 저장소의 진행을 기본값으로 덮어쓰지 않는다 (잠깐의 읽기 실패로 몇 달치 도감이 사라지는 것 방지).
+let loadFailed = false;
+
+/** 부팅 시 1회: 저장된 상태를 메모리로 불러와 병합. 주 슬롯을 못 읽으면 직전 백업 슬롯으로 복구 */
 export async function loadState(): Promise<boolean> {
   let oldSave = false;
+  let saved: unknown = null;
+  let readFailed = false;
   try {
-    const saved = await localforage.getItem<GameState>(KEY);
-    if (saved && saved.schemaVersion) {
-      oldSave = (saved.schemaVersion || 0) < 3; // caughtStages 없던 구버전 → 1회 보정 필요
-      Object.assign(gameState, buildMerged(saved)); // 기본값 위 병합 + 마이그레이션(불러오기와 공유)
-    }
+    saved = await localforage.getItem<GameState>(KEY);
   } catch (e) {
-    console.warn('[save] load 실패, 기본값 사용:', e);
+    readFailed = true;
+    console.warn('[save] load 실패:', e);
+  }
+  if (!isSaveLike(saved)) {
+    // 주 슬롯이 비었거나 못 읽음 → persist 가 매번 남겨 둔 직전 백업 슬롯으로 복구 시도
+    let backup: unknown = null;
+    try {
+      backup = await localforage.getItem<GameState>(BACKUP_KEY);
+    } catch (e) {
+      readFailed = true;
+      console.warn('[save] 백업 load 실패:', e);
+    }
+    if (isSaveLike(backup)) {
+      console.warn('[save] 주 저장을 읽지 못해 직전 백업으로 복구');
+      saved = backup;
+    } else if (readFailed) {
+      loadFailed = true;
+      console.warn('[save] 저장을 읽지 못해 기본값 사용 — 이 세션은 저장된 진행을 덮어쓰지 않음');
+    }
+  }
+  if (isSaveLike(saved)) {
+    try {
+      const merged = buildMerged(saved); // 기본값 위 병합 + 마이그레이션(불러오기와 공유)
+      oldSave = (Number(saved.schemaVersion) || 0) < 3; // caughtStages 없던 구버전 → 1회 보정 필요
+      Object.assign(gameState, merged);
+    } catch (e) {
+      loadFailed = true;
+      console.warn('[save] 저장 해석 실패, 기본값 사용:', e);
+    }
   }
   try {
     const pw = await localforage.getItem<string>(PW_KEY);
@@ -171,22 +255,81 @@ export async function loadState(): Promise<boolean> {
   } catch (e) {
     console.warn('[save] 비밀번호 load 실패, 기본값 사용:', e);
   }
+  requestPersistentStorage();
   return oldSave;
+}
+
+/** 브라우저/웹뷰에 "이 저장소는 지우지 말라"고 요청 — 저장 공간 부족 때 IndexedDB 가 정리 대상이 되는 것을 줄인다 (미지원이면 무시) */
+function requestPersistentStorage(): void {
+  try {
+    const st = typeof navigator !== 'undefined' ? navigator.storage : undefined;
+    if (st && typeof st.persist === 'function') st.persist().catch(() => {});
+  } catch {
+    /* 미지원 */
+  }
+}
+
+// ── 저장 쓰기: 한 번에 하나씩(직렬) ──
+// 디바운스 저장·불러오기·관리자 모드 전환이 서로 끼어들면 "백업 ← 직전, 주 ← 현재" 순서가 깨질 수 있어 모두 한 줄로 세운다.
+let chain: Promise<unknown> = Promise.resolve();
+function enqueue<T>(fn: () => Promise<T>): Promise<T> {
+  const p = chain.then(fn);
+  chain = p.then(
+    () => undefined,
+    () => undefined,
+  );
+  return p;
+}
+
+/** 현재 메모리 상태를 저장소에 쓴다: 직전 저장은 백업 슬롯으로 */
+async function writeState(): Promise<void> {
+  try {
+    let prev: GameState | null = null;
+    let prevUnknown = false;
+    try {
+      prev = await localforage.getItem<GameState>(KEY);
+    } catch (e) {
+      prevUnknown = true; // 백업 회전만 건너뛰고 본 저장은 한다 (주 슬롯이 깨졌을 때 새 저장으로 살려야 하므로)
+      console.warn('[save] 직전 저장 읽기 실패(백업 회전 생략):', e);
+    }
+    if (loadFailed && (prev || prevUnknown)) {
+      console.warn('[save] 부팅 때 저장을 못 읽은 세션 — 저장된 진행을 덮어쓰지 않음');
+      return;
+    }
+    if (prev) await localforage.setItem(BACKUP_KEY, prev);
+    await localforage.setItem(KEY, gameState);
+  } catch (e) {
+    console.warn('[save] 저장 실패:', e);
+  }
 }
 
 let timer: ReturnType<typeof setTimeout> | null = null;
 /** 디바운스 저장 (잦은 호출 합치기) + 직전 백업 슬롯 유지 */
 export function persist(): void {
   if (timer) clearTimeout(timer);
-  timer = setTimeout(async () => {
-    try {
-      const prev = await localforage.getItem<GameState>(KEY);
-      if (prev) await localforage.setItem(BACKUP_KEY, prev);
-      await localforage.setItem(KEY, gameState);
-    } catch (e) {
-      console.warn('[save] 저장 실패:', e);
-    }
+  timer = setTimeout(() => {
+    timer = null;
+    void enqueue(writeState);
   }, 300);
+}
+
+/** 대기 중인 디바운스 저장을 지금 바로 쓴다(없으면 진행 중인 쓰기만 기다림). 홈 버튼·앱 전환 직후 앱이 죽어도 마지막 진행이 남게 */
+export function flushPersist(): Promise<void> {
+  if (!timer) return chain.then(() => undefined);
+  clearTimeout(timer);
+  timer = null;
+  return enqueue(writeState);
+}
+
+/** 화면이 가려질 때(홈 버튼·앱 전환·탭 숨김·페이지 종료) 대기 중인 저장을 바로 쓰도록 연결 */
+export function installBackgroundFlush(
+  win: { addEventListener(type: string, cb: () => void): void },
+  doc: { addEventListener(type: string, cb: () => void): void; hidden?: boolean },
+): void {
+  doc.addEventListener('visibilitychange', () => {
+    if (doc.hidden) void flushPersist();
+  });
+  win.addEventListener('pagehide', () => void flushPersist());
 }
 
 /** 스테이지 클리어 기록: 별 갱신(최고치), 다음 스테이지 해금, 코인 지급 */
@@ -248,7 +391,9 @@ function b64ToUtf8(b: string): string {
 }
 
 /** 현재 진행 상태 → 백업 코드 문자열 (카톡·메모에 보관용) */
+/** 관리자 모드 중에는 빈 문자열 — 그때 상태(코인 99999·전 포획)는 가짜라, 그 코드로 복구하면 실제 진행이 사라진다 (2026-10-15) */
 export function exportSave(): string {
+  if (gameState.adminMode) return '';
   return CODE_PREFIX + utf8ToB64(JSON.stringify(gameState));
 }
 
@@ -273,22 +418,30 @@ export async function importSave(code: string): Promise<{ ok: boolean; msg: stri
   } catch {
     return { ok: false, msg: '코드가 손상되었어요.' };
   }
-  if (!saved || typeof saved !== 'object' || (!Array.isArray(saved.caught) && typeof saved.coins !== 'number')) {
+  if (!isPlainObject(saved) || (!Array.isArray(saved.caught) && typeof saved.coins !== 'number')) {
     return { ok: false, msg: '백업 데이터가 아니에요.' };
   }
-  try {
-    if (timer) {
-      clearTimeout(timer); // 대기 중인 디바운스 저장 취소(레이스 방지)
-      timer = null;
+  return enqueue(async () => {
+    try {
+      if (timer) {
+        clearTimeout(timer); // 대기 중인 디바운스 저장 취소(레이스 방지)
+        timer = null;
+      }
+      Object.assign(gameState, buildMerged(saved));
+      let prev: GameState | null = null;
+      try {
+        prev = await localforage.getItem<GameState>(KEY);
+      } catch (e) {
+        console.warn('[save] 직전 저장 읽기 실패(백업 회전 생략):', e);
+      }
+      if (prev) await localforage.setItem(BACKUP_KEY, prev); // 직전 상태는 백업 슬롯에 보존
+      await localforage.setItem(KEY, gameState); // 즉시 저장(디바운스 X)
+      loadFailed = false; // 보호자가 직접 고른 데이터가 이제 기준
+      return { ok: true, msg: '불러오기 완료!' };
+    } catch {
+      return { ok: false, msg: '저장에 실패했어요.' };
     }
-    Object.assign(gameState, buildMerged(saved));
-    const prev = await localforage.getItem<GameState>(KEY);
-    if (prev) await localforage.setItem(BACKUP_KEY, prev); // 직전 상태는 백업 슬롯에 보존
-    await localforage.setItem(KEY, gameState); // 즉시 저장(디바운스 X)
-    return { ok: true, msg: '불러오기 완료!' };
-  } catch {
-    return { ok: false, msg: '저장에 실패했어요.' };
-  }
+  });
 }
 
 // ── 관리자(검증) 모드 ─────────────────────────────────────────────
@@ -299,30 +452,69 @@ export function isAdmin(): boolean {
   return !!gameState.adminMode;
 }
 
-export async function enterAdmin(): Promise<void> {
-  if (gameState.adminMode) return;
-  const snapshot = JSON.parse(JSON.stringify(gameState)); // 실제 상태 깊은 복제
-  snapshot.adminMode = false;
-  gameState.adminMode = true;
-  gameState.coins = 99999;
-  gameState.caught = Array.from({ length: POKE_TOTAL }, (_, i) => i + 1);
-  gameState.maxUnlocked = POKE_TOTAL;
-  if (timer) {
-    clearTimeout(timer); // 대기중 디바운스 저장 취소(레이스 방지)
-    timer = null;
-  }
-  await localforage.setItem(ADMIN_BACKUP_KEY, snapshot);
-  await localforage.setItem(KEY, gameState);
+/** 관리자 모드 ON. 켰으면(또는 이미 켜져 있으면) true, 저장을 못 읽은 세션이거나 백업 저장에 실패하면 아무것도 바꾸지 않고 false */
+export function enterAdmin(): Promise<boolean> {
+  return enqueue(async () => {
+    if (gameState.adminMode) return true;
+    try {
+      if (loadFailed) {
+        // 부팅 때 저장을 못 읽었으면 지금 메모리는 기본값 — 이걸 "실제 상태"로 백업하면 끌 때 진짜 진행이 사라진다
+        let cur: unknown = null;
+        let unknown = false;
+        try {
+          cur = await localforage.getItem(KEY);
+        } catch {
+          unknown = true;
+        }
+        if (cur || unknown) return false;
+      }
+      const snapshot = JSON.parse(JSON.stringify(gameState)); // 실제 상태 깊은 복제
+      snapshot.adminMode = false;
+      await localforage.setItem(ADMIN_BACKUP_KEY, snapshot); // 실제 상태를 먼저 안전하게 보관한 뒤에만 바꾼다
+      gameState.adminMode = true;
+      gameState.coins = 99999;
+      gameState.caught = Array.from({ length: POKE_TOTAL }, (_, i) => i + 1);
+      gameState.maxUnlocked = POKE_TOTAL;
+      if (timer) {
+        clearTimeout(timer); // 대기중 디바운스 저장 취소(레이스 방지)
+        timer = null;
+      }
+      await localforage.setItem(KEY, gameState);
+      return true;
+    } catch (e) {
+      console.warn('[save] 관리자 모드 켜기 실패:', e);
+      return false;
+    }
+  });
 }
 
-export async function exitAdmin(): Promise<void> {
-  const backup = await localforage.getItem<GameState>(ADMIN_BACKUP_KEY);
-  if (backup) Object.assign(gameState, buildMerged(backup)); // 실제 상태 복원
-  gameState.adminMode = false;
-  if (timer) {
-    clearTimeout(timer);
-    timer = null;
-  }
-  await localforage.removeItem(ADMIN_BACKUP_KEY);
-  await localforage.setItem(KEY, gameState);
+/** 관리자 모드 OFF: 백업해 둔 실제 상태로 복원. 백업을 읽지 못하면 아무것도 바꾸지 않고 false */
+export function exitAdmin(): Promise<boolean> {
+  return enqueue(async () => {
+    let backup: GameState | null;
+    try {
+      backup = await localforage.getItem<GameState>(ADMIN_BACKUP_KEY);
+    } catch (e) {
+      console.warn('[save] 관리자 백업 읽기 실패:', e);
+      return false;
+    }
+    if (backup) Object.assign(gameState, buildMerged(backup)); // 실제 상태 복원
+    gameState.adminMode = false;
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    try {
+      await localforage.setItem(KEY, gameState); // 실제 상태를 먼저 저장하고
+    } catch (e) {
+      console.warn('[save] 관리자 모드 끄기 저장 실패:', e);
+      return false;
+    }
+    try {
+      await localforage.removeItem(ADMIN_BACKUP_KEY); // 그 다음에 백업을 지운다 — 그 사이 앱이 꺼져도 진행이 남는다
+    } catch (e) {
+      console.warn('[save] 관리자 백업 정리 실패(다음 진입 때 덮어씀):', e);
+    }
+    return true;
+  });
 }

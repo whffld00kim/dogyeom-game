@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { App } from '@capacitor/app';
 import { DESIGN, HD } from './theme';
 import { startMusic, pauseForBackground, resumeFromBackground } from './systems/music';
+import { flushPersist, installBackgroundFlush } from './systems/save';
 import BootScene from './scenes/BootScene';
 import TitleScene from './scenes/TitleScene';
 import SettingsScene from './scenes/SettingsScene';
@@ -71,11 +72,16 @@ App.addListener('backButton', () => {
 }).catch(() => {});
 
 // 홈 버튼·앱 전환·화면 꺼짐 → 소리 끔, 돌아오면 복원. 앱(appStateChange)과 브라우저/PWA(visibilitychange) 양쪽
+// 가려질 때는 대기 중인(디바운스) 저장도 바로 쓴다 — 백그라운드에서 안드로이드가 앱을 죽여도 마지막 포획·코인이 남게
 App.addListener('appStateChange', ({ isActive }) => {
   if (isActive) resumeFromBackground();
-  else pauseForBackground();
+  else {
+    pauseForBackground();
+    void flushPersist();
+  }
 }).catch(() => {});
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) pauseForBackground();
   else resumeFromBackground();
 });
+installBackgroundFlush(window, document);

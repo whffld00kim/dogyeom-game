@@ -15,7 +15,7 @@ import {
   outfitPrice,
   type OutfitDef,
 } from '../systems/outfits';
-import { getName, loadPokeSprites, addPokeIcon, REGIONS } from '../systems/dex';
+import { getName, loadPokeSprites, addPokeIcon, REGIONS, pokeKeepKeys } from '../systems/dex';
 
 type Cell = { none: true } | { none: false; outfit: OutfitDef };
 const NONE = '__none__';
@@ -280,7 +280,7 @@ export default class ShopScene extends Phaser.Scene {
   /** 현재 페이지 + 선택 포켓몬 외 스프라이트 해제(메모리).
    *  반드시 미리보기 갱신 후 호출 — 표시 중 텍스처를 먼저 지우면 렌더 크래시. */
   private freeSelPoke() {
-    const keep = new Set([...this.selPageIds, this.selectedId].map((id) => `poke_${id}`));
+    const keep = pokeKeepKeys([...this.selPageIds, this.selectedId]);
     this.textures.getTextureKeys().forEach((k) => {
       if (k.startsWith('poke_') && !keep.has(k)) this.textures.remove(k);
     });

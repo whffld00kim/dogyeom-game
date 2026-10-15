@@ -3,9 +3,9 @@ import { DESIGN, FONT, COLORS, GROUND_Y, TEXT_RES, regionBgPath } from '../theme
 import { drawBackground, makeButton, addCoinHud, toast, applyHiRes } from '../widgets';
 import { makeStage, stageReward, BIOME_COLORS } from '../systems/stageGenerator';
 import type { Stage } from '../systems/stageGenerator';
-import { makeProblem } from '../systems/mathGenerator';
+import { makeFreshProblem } from '../systems/mathGenerator';
 import { gameState, recordStageClear, persist, bumpDailyCatch } from '../systems/save';
-import { catchSpecific, isCaught, isShiny, catchShiny, addSparkles, SHINY_GOLD_CSS, addAsh, addPokeIcon, loadPokeSprites, getName, TOTAL, REGIONS } from '../systems/dex';
+import { catchSpecific, isCaught, isShiny, catchShiny, addSparkles, SHINY_GOLD_CSS, addAsh, addPokeIcon, loadPokeSprites, getName, TOTAL, REGIONS, pokeKeepKeys } from '../systems/dex';
 import { playCorrect, playWrong, startBattleMusic, stopBattleMusic } from '../systems/music';
 import { TIME_SECONDS, catchSettingsOf } from '../systems/settings';
 import { isSyllable, syllableJamo, composeJamo, makeBlankProblem, makeNameOptions, keypadFor, isCho, isJung, isJongJamo, pickRandom } from '../systems/hangul';
@@ -20,6 +20,7 @@ export default class GameScene extends Phaser.Scene {
   private mistakes = 0;
   private bonusLost = false;
   private current!: Problem;
+  private usedTexts = new Set<string>(); // 이 판에 이미 낸 수학 식 — 같은 문제 반복 방지
   private accepting = false;
   private inputValue = '';
 
@@ -55,7 +56,8 @@ export default class GameScene extends Phaser.Scene {
   }
 
   init(data: { index?: number }) {
-    this.index = data.index ?? 1;
+    // 스테이지는 1~1025(포켓몬 수). 전엔 마지막 스테이지 결과의 '다음'이 1026을 열어 "스테이지 1026"으로 1025를 다시 했다
+    this.index = Phaser.Math.Clamp(Math.round(data.index ?? 1), 1, TOTAL);
   }
 
   create() {
@@ -71,6 +73,7 @@ export default class GameScene extends Phaser.Scene {
     this.stage = makeStage(this.index, this.settings);
     this.total = this.stage.problems;
     this.solved = 0;
+    this.usedTexts = new Set();
     this.mistakes = 0;
     this.bonusLost = false;
     this.accepting = false;
@@ -126,9 +129,9 @@ export default class GameScene extends Phaser.Scene {
     this.answerLayer = this.add.container(0, 0);
 
     // 메모리: 이전 배틀의 랜덤 포켓몬 텍스처 해제(연속 배틀 누적 방지 — 필요 시 자동 재로드)
-    const keep = `poke_${this.targetId}`;
+    const keep = pokeKeepKeys([this.targetId]); // 반짝이 도전이면 그 반짝이 그림도 남긴다
     this.textures.getTextureKeys().forEach((k) => {
-      if (k.startsWith('poke_') && k !== keep) this.textures.remove(k);
+      if (k.startsWith('poke_') && !keep.has(k)) this.textures.remove(k);
     });
 
     // 지역 배경 이미지 로드 → 적 스프라이트 로드 → 첫 문제 시작
@@ -141,7 +144,10 @@ export default class GameScene extends Phaser.Scene {
     // 지역 선택 화면에서 이미 받아둔 이미지(rbg{ri}) 재사용 → 없으면 새로 로드(쿼리 없이)
     const reuse = `rbg${ri}`;
     const bgKey = this.textures.exists(reuse) ? reuse : `bg_r${ri}`;
+    let started = false;
     const proceed = () => {
+      if (started) return; // 한 판에 문제 흐름은 한 번만 (두 번 시작되면 보기 타일이 겹쳐 엉뚱한 답으로 채점됐다)
+      started = true;
       this.placeRegionBg(bgKey);
       loadPokeSprites(this, [this.targetId], () => this.nextProblem());
     };
@@ -150,8 +156,10 @@ export default class GameScene extends Phaser.Scene {
       return;
     }
     this.load.image(bgKey, regionBgPath(ri));
+    // 파일이 없어도(loaderror) 로더는 끝에 complete 를 내므로 complete 만 듣는다 — 그라데이션 폴백으로 진행.
+    // (전엔 loaderror 에도 proceed 를 걸어 배경이 없으면 두 번 시작됐고, 배경이 있으면 그 리스너가 남아
+    //  나중에 다른 그림(한글 문제의 랜덤 포켓몬 등)이 없을 때 배틀 도중 문제 흐름이 또 시작됐다)
     this.load.once('complete', proceed);
-    this.load.once('loaderror', () => proceed()); // 실패해도 진행(그라데이션 폴백)
     this.load.start();
   }
 
@@ -221,7 +229,8 @@ export default class GameScene extends Phaser.Scene {
 
   /** 수학 문제 출제(기존 경로) */
   private showMathProblem() {
-    this.current = makeProblem(this.settings);
+    this.current = makeFreshProblem(this.settings, this.usedTexts, this.current?.text ?? null);
+    this.usedTexts.add(this.current.text);
     this.bannerText.setFontSize(52).setText(`${this.current.text} = ?`);
     if (this.settings.answerMode === 'input') this.showInput();
     else this.showChoices();
